@@ -126,7 +126,8 @@ def cmd_finish(args):
     set_status(r, args.sha, args.verdict, status_description(round_no, args.verdict), args.pr)
     escalate = args.verdict == "failure" and failures >= MAX_FAILED_ROUNDS
     if escalate:
-        gh("pr", "edit", str(args.pr), "--add-label", NEEDS_HUMAN)
+        # REST, not `gh pr edit`: that trips over the Projects (classic) sunset.
+        gh("api", "-X", "POST", f"repos/{r}/issues/{args.pr}/labels", "-f", f"labels[]={NEEDS_HUMAN}")
     print(f"round {round_no}: {args.verdict}" + (f", labelled {NEEDS_HUMAN}" if escalate else ""))
     return 0
 

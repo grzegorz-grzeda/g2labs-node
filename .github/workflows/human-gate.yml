@@ -1,0 +1,81 @@
+name: human-gate
+
+# Keeps a PR from merging while it changes a gated path (.github/gated-paths)
+# or carries ready-for-human, until the maintainer adds human-approved. A push
+# after approval removes the label: approval covers only what was looked at.
+#
+# Runs on pull_request_target, so the gate and its path list always come from
+# main and a PR can't change its own gate. It never checks out or runs PR
+# code: the changed files and labels come from the API. The verdict is the
+# `human-gate` commit status on the PR's head commit, which main's branch
+# protection requires.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: human-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      ACTION: ${{ github.event.action }}
+    steps:
+      # main's copy of the gate (pull_request_target checks out the base).
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
+
+      # Approval covers only commits the maintainer has seen. The head has no
+      # human-gate status until a run on it finishes, so if it has none, the
+      # commits are new since any approval: drop it. Checking this in every
+      # run, not only on pushes, matters because a queued push run can be
+      # replaced by a later event's run. The one exception is the maintainer
+      # adding human-approved now, which approves the head as it is.
+      - name: Drop human-approved from unseen commits
+        if: ${{ !(github.event.action == 'labeled' && github.event.label.name == 'human-approved') }}
+        shell: bash
+        run: |
+          has_label=$(gh api "repos/$REPO/issues/$PR/labels" --jq '[.[].name] | index("human-approved") != null')
+          seen=$(gh api "repos/$REPO/commits/$HEAD_SHA/statuses" --jq '[.[] | select(.context == "human-gate")] | length')
+          if [ "$has_label" = true ] && [ "$seen" = 0 ]; then
+            gh api -X DELETE "repos/$REPO/issues/$PR/labels/human-approved" > /dev/null
+            gh api "repos/$REPO/issues/$PR/comments" -f body="New commits since approval, so \`human-approved\` was removed. Add it again once you've looked at them." > /dev/null
+          fi
+
+      - name: Decide and set the human-gate status
+        shell: bash  # -e and pipefail
+        run: |
+          # Fetch first, so a failing API call fails the job (and leaves no
+          # status) instead of feeding the gate an empty file list.
+          labels=$(gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name' | paste -sd, -)
+          files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" \
+                    --jq '.[] | .filename, (.previous_filename // empty)')
+          if [ -z "$files" ]; then
+            echo "no changed files reported for PR #$PR" >&2
+            exit 1
+          fi
+          set +e
+          reason=$(printf '%s\n' "$files" \
+                   | python3 .github/scripts/human_gate.py --patterns .github/gated-paths --labels "$labels")
+          verdict=$?
+          set -e
+          echo "$reason"
+          state=$([ "$verdict" = 0 ] && echo success || echo failure)
+          gh api "repos/$REPO/statuses/$HEAD_SHA" \
+            -f state="$state" -f context=human-gate -f description="${reason:0:140}" \
+            -f target_url="$GITHUB_SERVER_URL/$REPO/actions/runs/$GITHUB_RUN_ID" > /dev/null
+          exit "$verdict"

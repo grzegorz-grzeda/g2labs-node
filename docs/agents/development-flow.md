@@ -44,14 +44,9 @@ Examples: `feat/20-release-workflow`, `fix/7-broker-failover-timer`, `docs/30-mq
 
 A PR merges only when all of these pass:
 
-- **CI**: every job in `.github/workflows/`, currently the core tests and both sysbuild builds, later the Hub tests and the contract checks.
+- **CI**: every job in `.github/workflows/ci.yml`: `build-and-test` (core tests, contract check, both sysbuild builds) and `hub` (Hub build, tests and image).
 - **`claude-review`**: the review below.
-- **`human-gate`**: fails while the PR touches a gated path or carries `ready-for-human`, until the maintainer adds the `human-approved` label. Gated paths:
-  - `.github/workflows/**`
-  - release and signing configuration (`sysbuild*`, MCUboot key settings)
-  - `contract/**` changes that the grows-only check can't fully judge
-  - `docs/adr/**`
-  - `VERSION` (so release PRs always wait for the maintainer)
+- **`human-gate`**: fails while the PR touches a gated path or carries `ready-for-human`, until the maintainer adds the `human-approved` label. A push after that removes the label again, so approval covers only what was looked at. The gated paths (workflows, release and signing configuration, the contract, ADRs, `VERSION` and the like) are listed only in [`.github/gated-paths`](../../.github/gated-paths), with the reason for each. The `human-gate` workflow runs on `pull_request_target` from `main`'s copy, so a PR can't change its own gate, and reports as the `human-gate` commit status.
 
 The hardware smoke test (#16) needs real boards and is not a merge check; it gates stable Releases instead.
 
