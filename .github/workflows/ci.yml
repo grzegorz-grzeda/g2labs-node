@@ -99,6 +99,9 @@ jobs:
           python -m unittest discover -s contract
           python contract/check.py --publisher node twister-out
 
+      - name: review-pr skill's tests
+        run: python -m unittest discover -s .claude/skills/review-pr
+
       - name: Build ESP32-C6 (sysbuild + MCUboot)
         run: west build --sysbuild -d build-c6 -b esp32c6_devkitc/esp32c6/hpcore .
 
