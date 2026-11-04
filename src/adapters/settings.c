@@ -473,13 +473,26 @@ static int commit_broker(struct node_core *core)
 	return err ? err : settings_adapter_save_broker(core);
 }
 
+static bool has_known_network(const struct node_core *core, const char *ssid)
+{
+	for (size_t i = 0; i < node_core_known_network_count(core); i++) {
+		if (strcmp(node_core_known_network(core, i)->ssid, ssid) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /*
  * Lay the written Known Network keys over the core's list, then make the
  * core's list that: networks no longer in it are removed, the rest added or
- * updated. New SSIDs go to the end, so indexes close up after a commit.
+ * updated. New SSIDs go to the end, so indexes close up after a commit. A
+ * network the core rejects leaves the one it replaced in place, so a bad
+ * commit can't strand a Node without its Known Network.
  */
 static int commit_networks(struct node_core *core)
 {
+	struct node_known_network original[NODE_KNOWN_NETWORKS_MAX] = {0};
 	struct node_known_network wanted[NODE_KNOWN_NETWORKS_MAX] = {0};
 	int err = 0;
 
@@ -488,6 +501,7 @@ static int commit_networks(struct node_core *core)
 		const struct staged_network *sn = &staged.networks[i];
 
 		if (kn != NULL) {
+			original[i] = *kn;
 			wanted[i] = *kn;
 		}
 		if (sn->ssid_set && strcmp(sn->kn.ssid, wanted[i].ssid) != 0) {
@@ -525,8 +539,14 @@ static int commit_networks(struct node_core *core)
 		if (add_err) {
 			LOG_WRN("Known Network %zu not applied (%d)", j, add_err);
 			err = err ? err : add_err;
+			if (original[j].ssid[0] != '\0' && !has_known_network(core, original[j].ssid)) {
+				/* It was valid before, so this can't fail for being invalid. */
+				(void)node_core_add_known_network(core, original[j].ssid,
+								  original[j].password);
+			}
 		}
 	}
+	memset(original, 0, sizeof(original));
 	memset(wanted, 0, sizeof(wanted));
 
 	int save_err = settings_adapter_save_known_networks(core);
