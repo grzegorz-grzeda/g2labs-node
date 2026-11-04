@@ -13,7 +13,7 @@
 LOG_MODULE_REGISTER(watchdog_adapter, LOG_LEVEL_INF);
 
 static const struct device *const wdt = DEVICE_DT_GET(DT_ALIAS(watchdog0));
-/* The installed timeout, or negative while the watchdog isn't running. */
+/* The channel of the installed timeout, or negative while the watchdog isn't running. */
 static int wdt_channel = -1;
 
 void watchdog_adapter_init(uint32_t timeout_ms)
