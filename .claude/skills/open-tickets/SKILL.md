@@ -17,7 +17,7 @@ python3 .claude/skills/open-tickets/tickets.py --json   # the same, as data
 
 Run it from the checkout you're answering about. In a worktree that is behind `main`, say so, or run `git fetch` and read `origin/main`'s issues (`--issues <dir>` points it at another directory).
 
-Each entry shows the number, title, labels, parent, assignee, the open tickets it blocks, and the first paragraph of its "What to build" section. Open specs (issues other issues name as `parent`) are listed apart: they close when their children do.
+Each entry shows the number, title, labels, parent, assignee, the open tickets it blocks, and the first paragraph of its "What to build" section. Open specs (issues that other issues name as `parent`) are listed apart: they close when their children do.
 
 ## 2. Summarize
 

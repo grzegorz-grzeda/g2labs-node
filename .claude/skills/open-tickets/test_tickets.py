@@ -43,6 +43,11 @@ class Tickets(Fixture):
         self.write(2, issue(2, blocked_by="[99]"))
         self.assertEqual(self.rows()[2]["open_blockers"], [99])
 
+    def test_a_spec_stays_a_spec_when_its_children_close(self):
+        self.write(1, issue(1))
+        self.write(2, issue(2, parent="1", status="closed"))
+        self.assertEqual(self.rows()[1]["kind"], "spec")
+
     def test_open_parents_are_specs(self):
         self.write(1, issue(1))
         self.write(2, issue(2, parent="1", extra="assignee: claude\n"))

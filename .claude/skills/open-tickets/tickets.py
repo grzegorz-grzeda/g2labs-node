@@ -77,7 +77,8 @@ def is_open(issues, number):
 
 def tickets(issues):
     """Open issues with their open blockers, how many they block, and kind."""
-    parents = {i.get("parent") for i in issues.values() if is_open(issues, i["number"])}
+    # A spec is any issue that has children, open or closed.
+    parents = {i.get("parent") for i in issues.values()}
     rows = []
     for n, issue in sorted(issues.items()):
         if not is_open(issues, n):

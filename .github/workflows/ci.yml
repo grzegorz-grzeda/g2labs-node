@@ -103,7 +103,9 @@ jobs:
         run: |
           python -m unittest discover -s .github/scripts
           for skill in .claude/skills/*/; do
-            python -m unittest discover -s "$skill"
+            if ls "$skill"test_*.py > /dev/null 2>&1; then
+              python -m unittest discover -s "$skill"
+            fi
           done
 
       - name: Build ESP32-C6 (sysbuild + MCUboot)

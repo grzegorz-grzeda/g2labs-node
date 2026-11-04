@@ -1,6 +1,6 @@
 ---
 number: 37
-title: "open-tickets project skill"
+title: "List and summarize the workable backlog with a project skill"
 status: closed
 closed_reason: completed
 closed: 2026-11-04
@@ -11,7 +11,7 @@ assignee: claude
 created: 2026-11-04
 ---
 
-# open-tickets project skill
+# List and summarize the workable backlog with a project skill
 
 ## What to build
 
@@ -30,4 +30,4 @@ A project skill that lists and summarizes the open, unblocked tickets in `docs/i
 
 Done. `tickets.py` parses the issue files' front matter. It treats an unknown blocker number as open, so a typo never unblocks a ticket. It takes the summary from the first paragraph of "What to build". `SKILL.md` says how to present the list. The tests use fixture issue files plus a check that every real issue file parses.
 
-CI's "Development flow scripts' tests" step now runs the tests of every project skill in `.claude/skills/*/`, so a new skill's tests need no workflow change.
+CI's "Development flow scripts' tests" step now runs the tests of every project skill in `.claude/skills/*/` that has any, so a new skill's tests need no workflow change. The PR also names `mattpocock-skills:code-review` in `docs/agents/development-flow.md`, a one-line follow-up to #36's review.
