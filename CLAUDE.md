@@ -4,7 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-g2labs-node is a Zephyr RTOS-based IoT node application (MIT licensed). As of the initial commit the repository contains no source code or build files yet — only `README.md`, `LICENSE` and a generic C `.gitignore`.
+g2labs-node is a Zephyr RTOS-based IoT node application (MIT licensed). The product spec is GitHub issue #1; domain terms are in `GLOSSARY.md`.
+
+## Code layout
+
+- `core/` — the Node core: all decision-making, plain C. It must not include Zephyr Wi-Fi, Bluetooth, MQTT or MCUboot headers. Inputs are calls into `core/include/node/core.h`; outputs go only through the ports in `struct node_ports` (MQTT publish, Wi-Fi requests, image confirm). `core/core.cmake` adds it to a Zephyr `app` target.
+- `src/adapters/` — the only code that touches Zephyr radio, network and MCUboot APIs; each function implements one port.
+- `src/main.c` wires adapters into the core; `src/shell.c` holds the `node …` UART shell commands.
+- `tests/core/` — ztest suite driving the core through fake ports (`src/fake_ports.c`) on `native_sim`. Tests assert only on recorded outputs, never on core internals.
+- `VERSION` — firmware version (`APP_VERSION_*` in `<zephyr/app_version.h>`, also used to sign the MCUboot image).
 
 ## Workspace layout
 
@@ -35,20 +43,28 @@ Run from the app directory. The Espressif HAL needs RF binary blobs fetched once
 west blobs fetch hal_espressif
 ```
 
+The firmware is always built through sysbuild, which also builds MCUboot and signs the image with MCUboot's development key (the "default MCUboot signing key" warning is expected). `--sysbuild` is required because this workspace doesn't enable it by default.
+
 ```bash
-west build -b esp32c6_devkitc/esp32c6/hpcore .     # build for ESP32-C6
-west build -b esp32s3_devkitc/esp32s3/procpu .     # build for ESP32-S3
-west build -p always -b <board> .                  # pristine rebuild (needed when switching boards)
-west flash
-west espressif monitor                             # serial console
-west build -t menuconfig                           # interactive Kconfig
+west build --sysbuild -d build-c6 -b esp32c6_devkitc/esp32c6/hpcore .     # build for ESP32-C6
+west build --sysbuild -d build-s3 -b esp32s3_devkitc/esp32s3/procpu .     # build for ESP32-S3
+west build --sysbuild -p always -d build-c6 -b esp32c6_devkitc/esp32c6/hpcore .  # pristine rebuild
+west flash -d build-c6                                                    # flashes MCUboot + Node image
+python -m serial.tools.miniterm /dev/ttyACM0 115200                       # serial console (shell: `node version`)
+west build -d build-c6 -t menuconfig                                      # interactive Kconfig (Node image)
 ```
 
-Use separate build dirs (`-d build-c6`, `-d build-s3`) to keep both targets built side by side.
+`west espressif monitor` also works, but only for the default `build/` dir (it has no `-d` option).
 
-Once the app exists, it is expected to follow the usual Zephyr application layout (`CMakeLists.txt`, `prj.conf`, `src/`, `boards/` overlays and optional `Kconfig`).
+## Test commands
 
-Note: `.gitignore` does not currently exclude the `build/` directory created by `west build`.
+Core tests run on `native_sim` under twister (needs host gcc with 32-bit support):
+
+```bash
+west twister -T tests -p native_sim
+```
+
+Build and twister output (`build*/`, `twister-out*/`) is git-ignored.
 
 ## Agent skills
 

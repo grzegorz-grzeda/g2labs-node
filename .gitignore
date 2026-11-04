@@ -53,3 +53,7 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Zephyr build and twister output
+/build*/
+/twister-out*/
