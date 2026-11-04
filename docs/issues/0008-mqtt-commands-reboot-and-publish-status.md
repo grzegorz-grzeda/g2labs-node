@@ -4,7 +4,7 @@ title: "MQTT commands: Reboot and Publish status"
 status: open
 labels: [ready-for-agent]
 parent: 1
-blocked_by: [6]
+blocked_by: [6, 21]
 created: 2026-11-04
 ---
 
@@ -21,3 +21,4 @@ A maintainer can reboot a Node or ask for fresh status by publishing a command t
 - [ ] Unknown or malformed commands are ignored and logged, and never crash the Node
 - [ ] The command topic and payload format are documented alongside the other topics
 - [ ] Core tests on `native_sim` cover both commands and malformed input
+- [ ] The command payload has a schema and examples in `contract/`, and the topic is in the index; the contract checker passes

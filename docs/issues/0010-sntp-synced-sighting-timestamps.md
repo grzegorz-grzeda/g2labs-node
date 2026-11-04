@@ -20,3 +20,4 @@ Sightings from different Nodes can be compared in time: once a Node syncs with S
 - [ ] After sync, Sightings carry an epoch-millisecond timestamp and no 'not synced' flag
 - [ ] Before sync, Sightings keep uptime plus the 'not synced' flag and are not held back
 - [ ] Core tests on `native_sim` cover the switch from unsynced to synced
+- [ ] The Sighting batch schema and examples in `contract/` cover synced and unsynced timestamps; the contract checker passes

@@ -4,7 +4,7 @@ title: "Batched BLE Sightings"
 status: open
 labels: [ready-for-agent]
 parent: 1
-blocked_by: [6]
+blocked_by: [6, 21]
 created: 2026-11-04
 ---
 
@@ -24,3 +24,4 @@ A Node passively scans BLE and reports every advertisement it hears as a Sightin
 - [ ] While the Broker is unreachable the buffer stays bounded and drops are counted
 - [ ] Batch topic and JSON fields are documented
 - [ ] Core tests on `native_sim` cover batching, overflow and the drop count
+- [ ] The Sighting batch payload has a schema and examples in `contract/`, and the topic is in the index; the contract checker passes

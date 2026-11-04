@@ -4,7 +4,7 @@ title: "Status reports board and IP address"
 status: open
 labels: [ready-for-agent]
 parent: 1
-blocked_by: []
+blocked_by: [21]
 created: 2026-11-04
 ---
 
@@ -20,3 +20,4 @@ The Hub needs to know which image fits a Node and how to reach it if mDNS fails,
 - [ ] Status carries `ip`, the Node's current IPv4 address as a dotted string
 - [ ] `docs/mqtt.md` documents both fields
 - [ ] Core tests on `native_sim` assert both fields in the published Status
+- [ ] The Status schema and examples in `contract/` include `board` and `ip`; the contract checker passes
