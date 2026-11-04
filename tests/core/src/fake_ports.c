@@ -5,6 +5,75 @@
 #include <string.h>
 
 #include <zephyr/sys/util.h>
+#include <zephyr/ztest.h>
+
+/* Host side of the publish dump, in publish_dump_bottom.c. */
+void publish_dump_bottom_write_line(const char *line);
+
+/*
+ * Every publish the core makes is also dumped, one JSON object per line
+ * ({"test", "topic", "payload", "retained"}), for the contract checker
+ * (contract/check.py) to validate against contract/.
+ */
+static char current_test[128];
+
+static void remember_test(const struct ztest_unit_test *test, void *data)
+{
+	ARG_UNUSED(data);
+	snprintk(current_test, sizeof(current_test), "%s.%s", test->test_suite_name, test->name);
+}
+
+ZTEST_RULE(fake_ports_test_name, remember_test, NULL);
+
+struct dump_writer {
+	char buf[FAKE_TOPIC_MAX * 6 + FAKE_PAYLOAD_MAX * 6 + sizeof(current_test) * 6 + 128];
+	size_t len;
+};
+
+static void dump_raw(struct dump_writer *w, const char *s)
+{
+	while (*s != '\0' && w->len < sizeof(w->buf) - 1) {
+		w->buf[w->len++] = *s++;
+	}
+}
+
+/* A JSON string of the len bytes at s, escaped. */
+static void dump_string(struct dump_writer *w, const char *s, size_t len)
+{
+	char esc[8];
+
+	dump_raw(w, "\"");
+	for (size_t i = 0; i < len; i++) {
+		unsigned char c = (unsigned char)s[i];
+
+		if (c == '"' || c == '\\') {
+			snprintk(esc, sizeof(esc), "\\%c", c);
+		} else if (c < 0x20) {
+			snprintk(esc, sizeof(esc), "\\u%04x", c);
+		} else {
+			esc[0] = (char)c;
+			esc[1] = '\0';
+		}
+		dump_raw(w, esc);
+	}
+	dump_raw(w, "\"");
+}
+
+static void dump_publish(const char *topic, const void *payload, size_t len, bool retained)
+{
+	static struct dump_writer w;
+
+	w.len = 0;
+	dump_raw(&w, "{\"test\":");
+	dump_string(&w, current_test, strlen(current_test));
+	dump_raw(&w, ",\"topic\":");
+	dump_string(&w, topic, strlen(topic));
+	dump_raw(&w, ",\"payload\":");
+	dump_string(&w, payload, len);
+	dump_raw(&w, retained ? ",\"retained\":true}" : ",\"retained\":false}");
+	w.buf[w.len] = '\0';
+	publish_dump_bottom_write_line(w.buf);
+}
 
 static void copy(char *dst, size_t size, const char *src)
 {
@@ -17,6 +86,7 @@ static int fake_mqtt_publish(void *ctx, const char *topic, const void *payload, 
 {
 	struct fake_ports *fake = ctx;
 
+	dump_publish(topic, payload, len, retained);
 	if (fake->publish_count >= FAKE_MAX_PUBLISHES) {
 		return -ENOMEM;
 	}

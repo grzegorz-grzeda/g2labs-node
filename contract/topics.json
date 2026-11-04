@@ -1,0 +1,25 @@
+{
+  "placeholders": {
+    "node-id": "[0-9a-f]{12}"
+  },
+  "topics": [
+    {
+      "pattern": "g2labs/<node-id>/availability",
+      "publisher": "node",
+      "retained": true,
+      "encoding": "text",
+      "values": ["online", "offline"],
+      "examples": "examples/availability",
+      "meaning": "Whether the Node is connected to the Broker; offline is also its last will."
+    },
+    {
+      "pattern": "g2labs/<node-id>/status",
+      "publisher": "node",
+      "retained": false,
+      "encoding": "json",
+      "schema": "schemas/status.schema.json",
+      "examples": "examples/status",
+      "meaning": "The Node's Status, right after online and then every 60 s."
+    }
+  ]
+}

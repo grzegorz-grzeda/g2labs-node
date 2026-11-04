@@ -1,6 +1,8 @@
 # MQTT topics and payloads
 
-What a Node publishes to the Broker. Topic names and JSON field names are a contract with the Aggregator and Home Assistant: change them only together with their consumers.
+What a Node publishes to the Broker. Topic names and payloads are the contract between Nodes and the Hub (ADR-0003: the Hub owns Home Assistant). This page explains it; the machine-readable contract is in [`contract/`](../contract/): the topic index `contract/topics.json`, a JSON Schema per JSON payload and example payloads. CI checks every publish in the core tests against it, and checks that this page covers every topic in the index.
+
+The contract only grows (ADR-0005): topics and fields are only ever added, and an existing field never changes its meaning or type and is never removed. A change that can't be made by adding gets a new topic. Change `contract/` in the same commit as the firmware and Hub code that needs it.
 
 ## Connection
 
@@ -54,4 +56,4 @@ Published right after `online`, then every 60 s while connected.
 | `rssi` | integer or `null` | RSSI of the Wi-Fi link in dBm; `null` when the Wi-Fi driver can't report it. |
 | `free_heap` | integer | Free heap memory in bytes, summed over all heaps. |
 
-Consumers must ignore fields they don't know: later tickets add fields (for example the Sighting drop count).
+Consumers must ignore fields they don't know: later tickets add fields (for example the Sighting drop count). The Node itself never sends a field that isn't in `contract/schemas/status.schema.json`.

@@ -94,6 +94,11 @@ jobs:
       - name: Node core tests (native_sim)
         run: west twister -T tests -p native_sim --inline-logs
 
+      - name: MQTT contract check (core tests' publishes)
+        run: |
+          python -m unittest discover -s contract
+          python contract/check.py --publisher node twister-out
+
       - name: Build ESP32-C6 (sysbuild + MCUboot)
         run: west build --sysbuild -d build-c6 -b esp32c6_devkitc/esp32c6/hpcore .
 

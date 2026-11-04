@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Status",
+  "description": "What a Node reports about itself on g2labs/<node-id>/status.",
+  "type": "object",
+  "properties": {
+    "node_id": {
+      "description": "The Node ID: the Wi-Fi MAC as 12 lowercase hex digits.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{12}$"
+    },
+    "name": {
+      "description": "The friendly name. Left out when none is set.",
+      "type": "string"
+    },
+    "fw_version": {
+      "description": "Firmware version, as in VERSION.",
+      "type": "string"
+    },
+    "uptime_s": {
+      "description": "Seconds since boot.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "network": {
+      "description": "SSID of the current Known Network.",
+      "type": "string"
+    },
+    "rssi": {
+      "description": "RSSI of the Wi-Fi link in dBm; null when the Wi-Fi driver can't report it.",
+      "type": ["integer", "null"],
+      "minimum": -128,
+      "maximum": 0
+    },
+    "free_heap": {
+      "description": "Free heap memory in bytes, summed over all heaps.",
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": ["node_id", "fw_version", "uptime_s", "network", "rssi", "free_heap"],
+  "additionalProperties": false
+}

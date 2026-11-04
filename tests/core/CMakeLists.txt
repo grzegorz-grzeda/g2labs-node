@@ -13,3 +13,6 @@ target_sources(app PRIVATE
   src/test_broker.c
   src/test_broker_failover.c
 )
+
+# Host side of the fake ports' publish dump (needs the host's stdio).
+target_sources(native_simulator INTERFACE src/publish_dump_bottom.c)

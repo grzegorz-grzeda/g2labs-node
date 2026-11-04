@@ -1,0 +1,9 @@
+{
+  "node_id": "a1b2c3d4e5f6",
+  "name": "Garage",
+  "fw_version": "0.1.0-dev",
+  "uptime_s": 86400,
+  "network": "workshop",
+  "rssi": null,
+  "free_heap": 48000
+}
