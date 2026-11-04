@@ -1,0 +1,64 @@
+name: human-gate
+
+# Keeps a PR from merging while it changes a gated path (.github/gated-paths)
+# or carries ready-for-human, until the maintainer adds human-approved. A push
+# after approval removes the label: approval covers only what was looked at.
+#
+# Runs on pull_request_target, so the gate and its path list always come from
+# main and a PR can't change its own gate. It never checks out or runs PR
+# code: the changed files and labels come from the API. The verdict is the
+# `human-gate` commit status on the PR's head commit, which main's branch
+# protection requires.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: human-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      ACTION: ${{ github.event.action }}
+    steps:
+      # main's copy of the gate (pull_request_target checks out the base).
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
+
+      - name: Drop human-approved after a push
+        if: github.event.action == 'synchronize'
+        run: |
+          if gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name' | grep -qx human-approved; then
+            gh api -X DELETE "repos/$REPO/issues/$PR/labels/human-approved" > /dev/null
+            gh api "repos/$REPO/issues/$PR/comments" -f body="New commits since approval, so \`human-approved\` was removed. Add it again once you've looked at them." > /dev/null
+          fi
+
+      - name: Decide and set the human-gate status
+        run: |
+          labels=$(gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name' | paste -sd, -)
+          set +e
+          reason=$(gh api --paginate "repos/$REPO/pulls/$PR/files" \
+                     --jq '.[] | .filename, (.previous_filename // empty)' \
+                   | python3 .github/scripts/human_gate.py --patterns .github/gated-paths --labels "$labels")
+          verdict=$?
+          set -e
+          echo "$reason"
+          state=$([ "$verdict" = 0 ] && echo success || echo failure)
+          gh api "repos/$REPO/statuses/$HEAD_SHA" \
+            -f state="$state" -f context=human-gate -f description="${reason:0:140}" \
+            -f target_url="$GITHUB_SERVER_URL/$REPO/actions/runs/$GITHUB_RUN_ID" > /dev/null
+          exit "$verdict"

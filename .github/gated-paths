@@ -1,0 +1,26 @@
+# Paths a PR may change only once the maintainer adds the `human-approved`
+# label (docs/agents/development-flow.md, ADR-0006). Checked by the
+# human-gate workflow, which always runs this file as it is on main.
+#
+# One glob per line, matched against repo-relative paths:
+#   `**` matches any number of directories, `*` anything but `/`.
+
+# CI, and the gate and the reviewer themselves
+.github/workflows/**
+.github/gated-paths
+.github/scripts/human_gate.py
+.claude/skills/review-pr/**
+
+# Release and signing configuration (MCUboot key settings live here)
+sysbuild*
+sysbuild/**
+**/*.pem
+
+# The MQTT contract, until the grows-only check (#31) can judge it
+contract/**
+
+# Decisions
+docs/adr/**
+
+# The version: release PRs always wait for the maintainer
+VERSION
