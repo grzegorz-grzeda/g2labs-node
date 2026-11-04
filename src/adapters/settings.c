@@ -51,6 +51,37 @@ static int read_string(char *dst, size_t dst_size, size_t len, settings_read_cb 
 	return 0;
 }
 
+/* Read a port in decimal, 1 to 65535; empty means the default port. */
+static int read_port(uint16_t *port, size_t len, settings_read_cb read_cb, void *cb_arg)
+{
+	char text[6];
+	int err = read_string(text, sizeof(text), len, read_cb, cb_arg);
+
+	if (err) {
+		return err;
+	}
+	if (text[0] == '\0') {
+		*port = NODE_BROKER_DEFAULT_PORT;
+		return 0;
+	}
+
+	char *end;
+	unsigned long value = strtoul(text, &end, 10);
+
+	if (*end != '\0' || value == 0 || value > UINT16_MAX) {
+		return -EINVAL;
+	}
+	*port = (uint16_t)value;
+	return 0;
+}
+
+bool settings_adapter_is_password_key(const char *name)
+{
+	const char *slash = strrchr(name, '/');
+
+	return strcmp(slash != NULL ? slash + 1 : name, "password") == 0;
+}
+
 /* Called for each "<i>/ssid" and "<i>/password" under node/kn. */
 static int load_known_network_cb(const char *key, size_t len, settings_read_cb read_cb,
 				 void *cb_arg, void *param)
@@ -116,7 +147,6 @@ static int load_broker_cb(const char *key, size_t len, settings_read_cb read_cb,
 	ARG_UNUSED(param);
 
 	struct node_broker *b = &loaded_broker;
-	char port[6];
 	int err = -ENOENT;
 
 	if (key == NULL) {
@@ -124,14 +154,10 @@ static int load_broker_cb(const char *key, size_t len, settings_read_cb read_cb,
 	} else if (strcmp(key, "host") == 0) {
 		err = read_string(b->host, sizeof(b->host), len, read_cb, cb_arg);
 	} else if (strcmp(key, "port") == 0) {
-		err = read_string(port, sizeof(port), len, read_cb, cb_arg);
-		if (err == 0) {
-			char *end;
-			unsigned long value = strtoul(port, &end, 10);
-
-			err = *end == '\0' && value <= UINT16_MAX ? 0 : -EINVAL;
+		err = read_port(&b->port, len, read_cb, cb_arg);
+		if (err) {
 			/* An invalid port makes node_core_set_broker() reject it. */
-			b->port = err == 0 ? (uint16_t)value : 0;
+			b->port = 0;
 		}
 	} else if (strcmp(key, "username") == 0) {
 		err = read_string(b->username, sizeof(b->username), len, read_cb, cb_arg);
@@ -271,47 +297,38 @@ int settings_adapter_save_known_networks(const struct node_core *core)
  *
  * Keys are relative to "node/": name, broker/host, broker/port,
  * broker/username, broker/password, kn/<i>/ssid and kn/<i>/password (i from 0
- * to NODE_KNOWN_NETWORKS_MAX - 1). An empty value clears a key; an empty SSID
- * removes that Known Network.
+ * to NODE_KNOWN_NETWORKS_MAX - 1, the core's order). An empty value clears a
+ * key; an empty SSID removes that Known Network.
  *
- * Writes are staged on a copy of the core's settings and reach the core only
- * on commit, so a Known Network's SSID and password or the Broker's host and
- * port change together. Commit applies each changed group through the core's
- * public API, which validates it, and saves what the core then holds, so
- * storage always matches the running Node.
+ * Writes are staged, key by key, and reach the core only on commit, so a
+ * Known Network's SSID and password or the Broker's host and port change
+ * together. Commit lays the written keys over what the core holds then (so
+ * changes made on the shell meanwhile survive), applies each changed group
+ * through the core's public API, which validates it, and saves what the core
+ * then holds, so storage always matches the running Node.
  *
  * Lock order is the core lock, then the settings subsystem's lock (the shell
  * saves while holding the core). settings_load() calls these handlers holding
  * the settings lock, so the SMP adapter refuses it; nothing else calls it.
  */
 
+struct staged_network {
+	bool ssid_set;
+	bool password_set;
+	struct node_known_network kn;
+};
+
+/* Written keys awaiting commit; guarded by the core lock. */
 static struct {
-	bool active; /* the copy below was taken from the core */
-	bool name_changed;
-	bool broker_changed;
-	bool networks_changed;
+	bool name_set;
+	bool host_set;
+	bool port_set;
+	bool username_set;
+	bool password_set;
 	char name[NODE_FRIENDLY_NAME_MAX_LEN + 1];
 	struct node_broker broker;
-	struct node_known_network networks[NODE_KNOWN_NETWORKS_MAX];
+	struct staged_network networks[NODE_KNOWN_NETWORKS_MAX];
 } staged;
-
-static void stage_from_core(const struct node_core *core)
-{
-	if (staged.active) {
-		return;
-	}
-	memset(&staged, 0, sizeof(staged));
-	strcpy(staged.name, node_core_friendly_name(core));
-	staged.broker = *node_core_broker(core);
-	for (size_t i = 0; i < NODE_KNOWN_NETWORKS_MAX; i++) {
-		const struct node_known_network *kn = node_core_known_network(core, i);
-
-		if (kn != NULL) {
-			staged.networks[i] = *kn;
-		}
-	}
-	staged.active = true;
-}
 
 /*
  * Parse "kn/<i>/<field>" into the index and the field. Returns false for any
@@ -335,11 +352,14 @@ static bool parse_network_key(const char *name, size_t *i, const char **field)
 	return true;
 }
 
-static bool is_password_key(const char *name)
+/* Read a staged string value and mark it set when that works. */
+static int stage_string(char *dst, size_t dst_size, bool *set, size_t len,
+			settings_read_cb read_cb, void *cb_arg)
 {
-	const char *slash = strrchr(name, '/');
+	int err = read_string(dst, dst_size, len, read_cb, cb_arg);
 
-	return strcmp(slash != NULL ? slash + 1 : name, "password") == 0;
+	*set |= err == 0;
+	return err;
 }
 
 static int node_settings_set(const char *name, size_t len, settings_read_cb read_cb, void *cb_arg)
@@ -348,52 +368,37 @@ static int node_settings_set(const char *name, size_t len, settings_read_cb read
 		return -EAGAIN;
 	}
 
-	struct node_core *core = app_core_lock();
 	struct node_broker *b = &staged.broker;
 	const char *field;
 	size_t i;
-	char port[6];
 	int err = -ENOENT;
 
-	stage_from_core(core);
+	(void)app_core_lock();
 	if (strcmp(name, "name") == 0) {
-		err = read_string(staged.name, sizeof(staged.name), len, read_cb, cb_arg);
-		staged.name_changed |= err == 0;
+		err = stage_string(staged.name, sizeof(staged.name), &staged.name_set, len,
+				   read_cb, cb_arg);
 	} else if (strcmp(name, "broker/host") == 0) {
-		err = read_string(b->host, sizeof(b->host), len, read_cb, cb_arg);
-		staged.broker_changed |= err == 0;
+		err = stage_string(b->host, sizeof(b->host), &staged.host_set, len, read_cb,
+				   cb_arg);
 	} else if (strcmp(name, "broker/port") == 0) {
-		err = read_string(port, sizeof(port), len, read_cb, cb_arg);
-		if (err == 0) {
-			char *end;
-			unsigned long value = port[0] != '\0' ? strtoul(port, &end, 10)
-							      : NODE_BROKER_DEFAULT_PORT;
-
-			err = (port[0] == '\0' || *end == '\0') && value > 0 &&
-					      value <= UINT16_MAX
-				      ? 0
-				      : -EINVAL;
-			if (err == 0) {
-				b->port = (uint16_t)value;
-				staged.broker_changed = true;
-			}
-		}
+		err = read_port(&b->port, len, read_cb, cb_arg);
+		staged.port_set |= err == 0;
 	} else if (strcmp(name, "broker/username") == 0) {
-		err = read_string(b->username, sizeof(b->username), len, read_cb, cb_arg);
-		staged.broker_changed |= err == 0;
+		err = stage_string(b->username, sizeof(b->username), &staged.username_set, len,
+				   read_cb, cb_arg);
 	} else if (strcmp(name, "broker/password") == 0) {
-		err = read_string(b->password, sizeof(b->password), len, read_cb, cb_arg);
-		staged.broker_changed |= err == 0;
+		err = stage_string(b->password, sizeof(b->password), &staged.password_set, len,
+				   read_cb, cb_arg);
 	} else if (parse_network_key(name, &i, &field)) {
-		struct node_known_network *kn = &staged.networks[i];
+		struct staged_network *sn = &staged.networks[i];
 
 		if (strcmp(field, "ssid") == 0) {
-			err = read_string(kn->ssid, sizeof(kn->ssid), len, read_cb, cb_arg);
+			err = stage_string(sn->kn.ssid, sizeof(sn->kn.ssid), &sn->ssid_set, len,
+					   read_cb, cb_arg);
 		} else if (strcmp(field, "password") == 0) {
-			err = read_string(kn->password, sizeof(kn->password), len, read_cb,
-					  cb_arg);
+			err = stage_string(sn->kn.password, sizeof(sn->kn.password),
+					   &sn->password_set, len, read_cb, cb_arg);
 		}
-		staged.networks_changed |= err == 0;
 	}
 	app_core_unlock();
 	return err;
@@ -416,7 +421,7 @@ static int node_settings_get(const char *name, char *val, int val_len_max)
 		return -EAGAIN;
 	}
 	/* Passwords are never returned; the SMP adapter refuses them first. */
-	if (is_password_key(name)) {
+	if (settings_adapter_is_password_key(name)) {
 		return -EACCES;
 	}
 
@@ -445,37 +450,97 @@ static int node_settings_get(const char *name, char *val, int val_len_max)
 	return ret;
 }
 
-/* Make the core's Known Networks the staged ones with an SSID, in index order. */
-static int apply_networks(struct node_core *core)
+static int commit_broker(struct node_core *core)
 {
+	struct node_broker broker = *node_core_broker(core);
+
+	if (staged.host_set) {
+		strcpy(broker.host, staged.broker.host);
+	}
+	if (staged.port_set) {
+		broker.port = staged.broker.port;
+	}
+	if (staged.username_set) {
+		strcpy(broker.username, staged.broker.username);
+	}
+	if (staged.password_set) {
+		strcpy(broker.password, staged.broker.password);
+	}
+
+	int err = node_core_set_broker(core, &broker);
+
+	memset(&broker, 0, sizeof(broker));
+	return err ? err : settings_adapter_save_broker(core);
+}
+
+/*
+ * Lay the written Known Network keys over the core's list, then make the
+ * core's list that: networks no longer in it are removed, the rest added or
+ * updated. New SSIDs go to the end, so indexes close up after a commit.
+ */
+static int commit_networks(struct node_core *core)
+{
+	struct node_known_network wanted[NODE_KNOWN_NETWORKS_MAX] = {0};
 	int err = 0;
+
+	for (size_t i = 0; i < NODE_KNOWN_NETWORKS_MAX; i++) {
+		const struct node_known_network *kn = node_core_known_network(core, i);
+		const struct staged_network *sn = &staged.networks[i];
+
+		if (kn != NULL) {
+			wanted[i] = *kn;
+		}
+		if (sn->ssid_set && strcmp(sn->kn.ssid, wanted[i].ssid) != 0) {
+			if (sn->kn.ssid[0] != '\0' && !sn->password_set) {
+				/* Never hand one network's password to another. */
+				LOG_WRN("Known Network %zu: a new SSID needs its password too", i);
+				err = err ? err : -EINVAL;
+				continue;
+			}
+			strcpy(wanted[i].ssid, sn->kn.ssid);
+		}
+		if (sn->password_set) {
+			strcpy(wanted[i].password, sn->kn.password);
+		}
+	}
 
 	for (size_t i = node_core_known_network_count(core); i-- > 0;) {
 		const char *ssid = node_core_known_network(core, i)->ssid;
 		bool kept = false;
 
 		for (size_t j = 0; j < NODE_KNOWN_NETWORKS_MAX && !kept; j++) {
-			kept = strcmp(staged.networks[j].ssid, ssid) == 0;
+			kept = strcmp(wanted[j].ssid, ssid) == 0;
 		}
 		if (!kept) {
 			(void)node_core_remove_known_network(core, ssid);
 		}
 	}
 	for (size_t j = 0; j < NODE_KNOWN_NETWORKS_MAX; j++) {
-		const struct node_known_network *kn = &staged.networks[j];
-
-		if (kn->ssid[0] == '\0') {
+		if (wanted[j].ssid[0] == '\0') {
 			continue;
 		}
 
-		int add_err = node_core_add_known_network(core, kn->ssid, kn->password);
+		int add_err = node_core_add_known_network(core, wanted[j].ssid, wanted[j].password);
 
 		if (add_err) {
 			LOG_WRN("Known Network %zu not applied (%d)", j, add_err);
 			err = err ? err : add_err;
 		}
 	}
-	return err;
+	memset(wanted, 0, sizeof(wanted));
+
+	int save_err = settings_adapter_save_known_networks(core);
+
+	return err ? err : save_err;
+}
+
+/* Log a group that didn't apply, and keep the first error. */
+static void note_result(int *err, int group_err, const char *group)
+{
+	if (group_err) {
+		LOG_WRN("%s not applied or saved (%d)", group, group_err);
+		*err = *err ? *err : group_err;
+	}
 }
 
 static int node_settings_commit(void)
@@ -485,37 +550,23 @@ static int node_settings_commit(void)
 	}
 
 	struct node_core *core = app_core_lock();
+	bool networks_set = false;
 	int err = 0;
-	int step;
 
-	if (staged.active && staged.name_changed) {
-		step = node_core_set_friendly_name(core, staged.name);
-		step = step ? step : settings_adapter_save_friendly_name(core);
-		if (step) {
-			LOG_WRN("friendly name not applied (%d)", step);
-		}
-		err = err ? err : step;
+	for (size_t i = 0; i < NODE_KNOWN_NETWORKS_MAX; i++) {
+		networks_set |= staged.networks[i].ssid_set || staged.networks[i].password_set;
 	}
-	if (staged.active && staged.broker_changed) {
-		step = node_core_set_broker(core, &staged.broker);
-		step = step ? step : settings_adapter_save_broker(core);
-		if (step) {
-			LOG_WRN("Broker not applied (%d)", step);
-		}
-		err = err ? err : step;
-	}
-	if (staged.active && staged.networks_changed) {
-		step = apply_networks(core);
+	if (staged.name_set) {
+		int name_err = node_core_set_friendly_name(core, staged.name);
 
-		int save_err = settings_adapter_save_known_networks(core);
-
-		if (save_err) {
-			LOG_WRN("Known Networks not saved (%d)", save_err);
-		}
-		err = err ? err : step ? step : save_err;
+		note_result(&err, name_err ? name_err : settings_adapter_save_friendly_name(core),
+			    "friendly name");
 	}
-	if (staged.active) {
-		LOG_INF("settings committed over SMP%s", err ? ", with errors" : "");
+	if (staged.host_set || staged.port_set || staged.username_set || staged.password_set) {
+		note_result(&err, commit_broker(core), "Broker");
+	}
+	if (networks_set) {
+		note_result(&err, commit_networks(core), "Known Networks");
 	}
 	memset(&staged, 0, sizeof(staged));
 	app_core_unlock();

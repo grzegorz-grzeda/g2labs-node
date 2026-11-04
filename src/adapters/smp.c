@@ -23,13 +23,6 @@ static bool is_node_key(const char *name)
 	return name != NULL && (strcmp(name, "node") == 0 || strncmp(name, "node/", 5) == 0);
 }
 
-static bool is_password(const char *name)
-{
-	const char *slash = strrchr(name, '/');
-
-	return strcmp(slash != NULL ? slash + 1 : name, "password") == 0;
-}
-
 static enum mgmt_cb_return settings_access(uint32_t event, enum mgmt_cb_return prev_status,
 					   int32_t *rc, uint16_t *group, bool *abort_more,
 					   void *data, size_t data_size)
@@ -47,7 +40,7 @@ static enum mgmt_cb_return settings_access(uint32_t event, enum mgmt_cb_return p
 	switch (access->access) {
 	case SETTINGS_ACCESS_READ:
 		/* Any password, under node/ or not. */
-		refuse = name != NULL && is_password(name);
+		refuse = name != NULL && settings_adapter_is_password_key(name);
 		break;
 	case SETTINGS_ACCESS_DELETE:
 		/*

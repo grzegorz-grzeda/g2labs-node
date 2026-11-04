@@ -83,11 +83,11 @@ The `node …` commands hide passwords here too.
 | `node/name` | the friendly name |
 | `node/broker/host`, `node/broker/port` | the Broker; an empty port means 1883 |
 | `node/broker/username`, `node/broker/password` | the Broker login |
-| `node/kn/<i>/ssid`, `node/kn/<i>/password` | Known Network `<i>`, from 0 to 4, in the order added |
+| `node/kn/<i>/ssid`, `node/kn/<i>/password` | Known Network `<i>`, from 0 to 4, in the order `node network list` shows (from 1 there) |
 
 Values are text. Reads return what the running Node uses. **Passwords are never returned**: reading any `…/password` key is refused.
 
-Writes are **staged**. A **commit** applies all of them to the Node together, and saves what the Node then holds. You never need a separate save. So a Known Network's SSID and password, or the Broker's host and port, change together:
+Writes are **staged**. A **commit** applies all of them to the Node together, and saves what the Node then holds. You never need a separate save. So a Known Network's SSID and password, or the Broker's host and port, change together. Only the keys you wrote change. A change made on the UART shell between your writes and the commit is kept.
 
 ```bash
 S="smpmgr --plugin-path=scripts/smpmgr --ip 192.168.1.50"
@@ -98,6 +98,7 @@ $S settings commit
 ```
 
 - An empty value clears a key: `settings write node/name ""` clears the friendly name, and an empty `node/kn/<i>/ssid` removes that Known Network.
+- A new SSID needs its password written in the same commit (empty for an open network). Otherwise the Node would join the new network with the old network's password, so it leaves that Known Network unchanged. A new Known Network goes to the end of the list, and the indexes close up after a removal, so read the SSIDs back after a commit.
 - A new Broker applies at once, and the Node reconnects. A change of Known Networks leaves the Node on its current network while that network is healthy, as on the UART shell.
 - The Node checks committed values the way the shell does: password lengths, a password needs a username, and so on. A friendly name or Broker that fails the check is not applied, and neither is a Known Network that fails it. The Node logs why, but the commit still answers success (Zephyr ignores the result), so read the keys back to see what was applied.
 - Deleting a `node/…` key is refused: write an empty value instead. Load is refused too, because settings are loaded at boot and saved on every commit.

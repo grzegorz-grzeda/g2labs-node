@@ -63,8 +63,13 @@ int settings_adapter_load(struct node_core *core);
 int settings_adapter_save_known_networks(const struct node_core *core);
 int settings_adapter_save_broker(const struct node_core *core);
 int settings_adapter_save_friendly_name(const struct node_core *core);
+/* Whether a settings key names a password ("…/password"), never to be read back. */
+bool settings_adapter_is_password_key(const char *name);
 
-/* Guard settings management over SMP-UDP: no password reads. */
+/*
+ * Guard settings management over SMP-UDP: refuse password reads, deletes
+ * under node/ and settings load.
+ */
 void smp_adapter_init(void);
 
 #endif /* NODE_APP_ADAPTERS_H */
