@@ -73,10 +73,9 @@ jobs:
             west config manifest.project-filter -- "$WEST_PROJECT_FILTER"
           fi
           west update --narrow -o=--depth=1
-          pip install \
-            -r zephyr/scripts/requirements-base.txt \
-            -r zephyr/scripts/requirements-build-test.txt \
-            -r zephyr/scripts/requirements-run-test.txt
+          # Zephyr's requirements plus each module's own (esptool from
+          # hal_espressif, imgtool's deps from mcuboot).
+          west packages pip --install --ignore-venv-check
           west blobs fetch hal_espressif --auto-accept
 
       - name: Cache Zephyr SDK
