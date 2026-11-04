@@ -5,6 +5,7 @@ status: open
 labels: [ready-for-human]
 parent:
 blocked_by: [33, 34]
+assignee: claude
 created: 2026-11-04
 ---
 
