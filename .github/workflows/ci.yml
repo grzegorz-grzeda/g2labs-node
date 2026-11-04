@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Zephyr commit the Node is built and tested against. Bump it together with
+  # the local workspace (`git -C ~/zephyrproject/zephyr rev-parse HEAD`).
+  ZEPHYR_REVISION: decee24b4fbc5aa221194cde98bb183639840de8
+  ZEPHYR_SDK_VERSION: 1.0.1
+  # Only the west modules the Node's builds and tests use.
+  WEST_PROJECT_FILTER: -.*,+hal_espressif,+mcuboot,+mbedtls,+tf-psa-crypto
+  ZEPHYR_BASE: ${{ github.workspace }}/ws/zephyr
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ws/apps/g2labs-node
+    steps:
+      # Mirror the local layout: <workspace>/apps/g2labs-node next to zephyr/.
+      - uses: actions/checkout@v7
+        with:
+          path: ws/apps/g2labs-node
+
+      - name: Install host packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-multilib g++-multilib ninja-build device-tree-compiler
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Cache west workspace
+        uses: actions/cache@v6
+        with:
+          path: |
+            ws/.west
+            ws/zephyr
+            ws/modules
+            ws/bootloader
+          key: west-${{ env.ZEPHYR_REVISION }}-${{ env.WEST_PROJECT_FILTER }}
+
+      - name: Set up west workspace
+        working-directory: ws
+        run: |
+          pip install west
+          if [ ! -d .west ]; then
+            mkdir -p zephyr
+            git -C zephyr init -q
+            git -C zephyr remote add origin https://github.com/zephyrproject-rtos/zephyr
+            git -C zephyr fetch -q --depth 1 origin "$ZEPHYR_REVISION"
+            git -C zephyr checkout -q FETCH_HEAD
+            west init -l zephyr
+            west config manifest.project-filter -- "$WEST_PROJECT_FILTER"
+          fi
+          west update --narrow -o=--depth=1
+          pip install \
+            -r zephyr/scripts/requirements-base.txt \
+            -r zephyr/scripts/requirements-build-test.txt \
+            -r zephyr/scripts/requirements-run-test.txt
+          west blobs fetch hal_espressif --auto-accept
+
+      - name: Cache Zephyr SDK
+        uses: actions/cache@v6
+        with:
+          path: ~/zephyr-sdk-${{ env.ZEPHYR_SDK_VERSION }}
+          key: zephyr-sdk-${{ env.ZEPHYR_SDK_VERSION }}-riscv64-xtensa-esp32s3
+
+      - name: Install Zephyr SDK
+        run: |
+          west sdk install --version "$ZEPHYR_SDK_VERSION" \
+            -d ~/zephyr-sdk-"$ZEPHYR_SDK_VERSION" --no-hosttools \
+            --gnu-toolchains riscv64-zephyr-elf xtensa-espressif_esp32s3_zephyr-elf
+
+      - name: Node core tests (native_sim)
+        run: west twister -T tests -p native_sim --inline-logs
+
+      - name: Build ESP32-C6 (sysbuild + MCUboot)
+        run: west build --sysbuild -d build-c6 -b esp32c6_devkitc/esp32c6/hpcore .
+
+      - name: Build ESP32-S3 (sysbuild + MCUboot)
+        run: west build --sysbuild -d build-s3 -b esp32s3_devkitc/esp32s3/procpu .
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: twister-report
+          path: ws/apps/g2labs-node/twister-out/twister*.xml
+          if-no-files-found: ignore

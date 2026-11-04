@@ -66,6 +66,10 @@ west twister -T tests -p native_sim
 
 Build and twister output (`build*/`, `twister-out*/`) is git-ignored.
 
+## CI
+
+`.github/workflows/ci.yml` runs the core tests and both sysbuild builds on every push and pull request. It recreates a minimal workspace pinned to `ZEPHYR_REVISION` (with only the west modules in `WEST_PROJECT_FILTER`) and Zephyr SDK `ZEPHYR_SDK_VERSION`. When the local workspace's Zephyr or SDK is updated, bump those values in the same change.
+
 ## Agent skills
 
 ### Issue tracker
