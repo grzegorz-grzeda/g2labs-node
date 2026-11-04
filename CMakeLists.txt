@@ -12,6 +12,7 @@ target_sources(app PRIVATE
   src/adapters/memory.c
   src/adapters/mqtt.c
   src/adapters/settings.c
+  src/adapters/smp.c
   src/adapters/system.c
   src/adapters/wifi.c
 )

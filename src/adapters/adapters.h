@@ -14,6 +14,24 @@
 
 int image_adapter_confirm(void *ctx);
 
+#define IMAGE_ADAPTER_SLOTS       2
+#define IMAGE_ADAPTER_VERSION_LEN 24 /* "255.255.65535.4294967295" */
+#define IMAGE_ADAPTER_HASH_LEN    32 /* SHA-256 */
+
+/* An image in one of the two MCUboot slots, as SMP's image list reports it. */
+struct image_adapter_slot {
+	int slot;
+	char version[IMAGE_ADAPTER_VERSION_LEN + 1];
+	uint8_t hash[IMAGE_ADAPTER_HASH_LEN];
+	bool active;    /* running now */
+	bool confirmed; /* MCUboot keeps it */
+	bool pending;   /* MCUboot swaps to it on the next reboot */
+	bool permanent; /* pending, and confirmed once swapped */
+};
+
+/* Fill slots with the images present; returns how many (0 to IMAGE_ADAPTER_SLOTS). */
+size_t image_adapter_list(struct image_adapter_slot slots[IMAGE_ADAPTER_SLOTS]);
+
 int mqtt_adapter_connect(void *ctx, const struct node_mqtt_connect *params);
 int mqtt_adapter_disconnect(void *ctx);
 int mqtt_adapter_publish(void *ctx, const char *topic, const void *payload, size_t len,
@@ -45,5 +63,13 @@ int settings_adapter_load(struct node_core *core);
 int settings_adapter_save_known_networks(const struct node_core *core);
 int settings_adapter_save_broker(const struct node_core *core);
 int settings_adapter_save_friendly_name(const struct node_core *core);
+/* Whether a settings key names a password ("…/password"), never to be read back. */
+bool settings_adapter_is_password_key(const char *name);
+
+/*
+ * Guard settings management over SMP-UDP: refuse password reads, deletes
+ * under node/ and settings load.
+ */
+void smp_adapter_init(void);
 
 #endif /* NODE_APP_ADAPTERS_H */
