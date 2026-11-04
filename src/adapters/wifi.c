@@ -231,8 +231,10 @@ int wifi_adapter_disconnect(void *ctx)
 	return 0;
 }
 
-int wifi_adapter_link_info(int *rssi, char *ip, size_t ip_len)
+int wifi_adapter_rssi(void *ctx, int *rssi)
 {
+	ARG_UNUSED(ctx);
+
 	struct net_if *iface = net_if_get_first_wifi();
 	struct wifi_iface_status status = {0};
 
@@ -246,6 +248,34 @@ int wifi_adapter_link_info(int *rssi, char *ip, size_t ip_len)
 		return err;
 	}
 	*rssi = status.rssi;
+	return 0;
+}
+
+int wifi_adapter_mac(uint8_t mac[NODE_MAC_LEN])
+{
+	struct net_if *iface = net_if_get_first_wifi();
+	struct net_linkaddr *addr = iface != NULL ? net_if_get_link_addr(iface) : NULL;
+
+	if (addr == NULL || addr->len != NODE_MAC_LEN) {
+		return -ENODEV;
+	}
+	memcpy(mac, addr->addr, NODE_MAC_LEN);
+	return 0;
+}
+
+int wifi_adapter_link_info(int *rssi, char *ip, size_t ip_len)
+{
+	struct net_if *iface = net_if_get_first_wifi();
+
+	if (iface == NULL) {
+		return -ENODEV;
+	}
+
+	int err = wifi_adapter_rssi(NULL, rssi);
+
+	if (err) {
+		return err;
+	}
 
 	struct net_in_addr *addr = net_if_ipv4_get_global_addr(iface, NET_ADDR_PREFERRED);
 

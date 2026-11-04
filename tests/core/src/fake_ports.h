@@ -11,7 +11,7 @@
 
 #include <node/core.h>
 
-#define FAKE_MAX_PUBLISHES 16
+#define FAKE_MAX_PUBLISHES 32
 #define FAKE_TOPIC_MAX     128
 #define FAKE_PAYLOAD_MAX   512
 
@@ -20,6 +20,21 @@ struct fake_publish {
 	char payload[FAKE_PAYLOAD_MAX];
 	size_t len;
 	bool retained;
+};
+
+/* A copy of the parameters of the latest mqtt_connect. */
+struct fake_mqtt_connect {
+	char host[NODE_BROKER_HOST_MAX_LEN + 1];
+	uint16_t port;
+	char client_id[NODE_ID_LEN + 1];
+	/* NULL pointers are recorded as has_* = false. */
+	bool has_username;
+	char username[NODE_BROKER_USERNAME_MAX_LEN + 1];
+	bool has_password;
+	char password[NODE_BROKER_PASSWORD_MAX_LEN + 1];
+	char will_topic[FAKE_TOPIC_MAX];
+	char will_payload[FAKE_PAYLOAD_MAX];
+	bool will_retained;
 };
 
 struct fake_ports {
@@ -33,6 +48,14 @@ struct fake_ports {
 	char last_connect_ssid[NODE_SSID_MAX_LEN + 1];
 	char last_connect_password[NODE_PASSWORD_MAX_LEN + 1];
 	size_t image_confirm_count;
+	size_t mqtt_connect_count;
+	struct fake_mqtt_connect last_mqtt_connect;
+	size_t mqtt_disconnect_count;
+
+	/* What the fake platform reports: link RSSI (or rssi_result), free memory. */
+	int rssi;
+	int rssi_result;
+	size_t free_memory;
 
 	/* Return codes the fake Wi-Fi requests give back (0 = accepted). */
 	int wifi_scan_result;

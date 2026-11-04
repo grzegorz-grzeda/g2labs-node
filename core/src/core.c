@@ -2,7 +2,19 @@
 #include <node/core.h>
 
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
+
+static void format_id(char *id, const uint8_t mac[NODE_MAC_LEN])
+{
+	static const char hex[] = "0123456789abcdef";
+
+	for (size_t i = 0; i < NODE_MAC_LEN; i++) {
+		id[2 * i] = hex[mac[i] >> 4];
+		id[2 * i + 1] = hex[mac[i] & 0x0f];
+	}
+	id[NODE_ID_LEN] = '\0';
+}
 
 void node_core_init(struct node_core *core, const struct node_ports *ports,
 		    const struct node_info *info)
@@ -11,6 +23,207 @@ void node_core_init(struct node_core *core, const struct node_ports *ports,
 	core->ports = ports;
 	core->info = *info;
 	core->wifi_state = NODE_WIFI_IDLE;
+	core->broker_state = NODE_BROKER_IDLE;
+	core->broker.port = NODE_BROKER_DEFAULT_PORT;
+	format_id(core->id, info->mac);
+}
+
+/* g2labs/<node-id>/<leaf>: every topic of the Node's own. */
+#define TOPIC_MAX (sizeof("g2labs//availability") + NODE_ID_LEN)
+
+static void node_topic(const struct node_core *core, char *topic, const char *leaf)
+{
+	snprintf(topic, TOPIC_MAX, "g2labs/%s/%s", core->id, leaf);
+}
+
+static void publish(struct node_core *core, const char *leaf, const char *payload, bool retained)
+{
+	char topic[TOPIC_MAX];
+
+	node_topic(core, topic, leaf);
+	(void)core->ports->mqtt_publish(core->ports->ctx, topic, payload, strlen(payload),
+					retained);
+}
+
+static void broker_connect(struct node_core *core)
+{
+	const struct node_broker *b = &core->broker;
+	char will_topic[TOPIC_MAX];
+
+	node_topic(core, will_topic, "availability");
+
+	const struct node_mqtt_connect params = {
+		.host = b->host,
+		.port = b->port,
+		.client_id = core->id,
+		.username = b->username[0] != '\0' ? b->username : NULL,
+		.password = b->password[0] != '\0' ? b->password : NULL,
+		.will_topic = will_topic,
+		.will_payload = "offline",
+		.will_retained = true,
+	};
+
+	(void)core->ports->mqtt_connect(core->ports->ctx, &params);
+	core->broker_state = NODE_BROKER_CONNECTING;
+	core->broker_timeout_ms = core->now_ms + NODE_BROKER_CONNECT_TIMEOUT_MS;
+}
+
+/* Close or abandon the Broker connection; with `retry`, connect again later. */
+static void broker_disconnect(struct node_core *core, bool retry)
+{
+	if (core->broker_state == NODE_BROKER_CONNECTED) {
+		/* A clean disconnect doesn't fire the last will. */
+		publish(core, "availability", "offline", true);
+	}
+	(void)core->ports->mqtt_disconnect(core->ports->ctx);
+	core->broker_state = retry ? NODE_BROKER_RETRY_WAIT : NODE_BROKER_IDLE;
+	core->broker_timeout_ms = core->now_ms + NODE_BROKER_RETRY_INTERVAL_MS;
+}
+
+/* Appends to a fixed buffer; output past the end is dropped and flagged. */
+struct json_writer {
+	char *buf;
+	size_t size;
+	size_t len;
+	bool overflow;
+	/* A member has been written, so the next needs a comma. */
+	bool has_member;
+};
+
+static void json_putc(struct json_writer *w, char c)
+{
+	if (w->len + 1 < w->size) {
+		w->buf[w->len++] = c;
+		w->buf[w->len] = '\0';
+	} else {
+		w->overflow = true;
+	}
+}
+
+static void json_raw(struct json_writer *w, const char *s)
+{
+	while (*s != '\0') {
+		json_putc(w, *s++);
+	}
+}
+
+/* A JSON string: quotes, backslashes and control characters escaped. */
+static void json_string(struct json_writer *w, const char *s)
+{
+	static const char hex[] = "0123456789abcdef";
+
+	json_putc(w, '"');
+	for (; *s != '\0'; s++) {
+		unsigned char c = (unsigned char)*s;
+
+		if (c == '"' || c == '\\') {
+			json_putc(w, '\\');
+			json_putc(w, (char)c);
+		} else if (c < 0x20) {
+			json_raw(w, "\\u00");
+			json_putc(w, hex[c >> 4]);
+			json_putc(w, hex[c & 0x0f]);
+		} else {
+			json_putc(w, (char)c);
+		}
+	}
+	json_putc(w, '"');
+}
+
+static void json_key(struct json_writer *w, const char *key)
+{
+	if (w->has_member) {
+		json_putc(w, ',');
+	}
+	w->has_member = true;
+	json_string(w, key);
+	json_putc(w, ':');
+}
+
+static void json_unsigned(struct json_writer *w, unsigned long v)
+{
+	char num[24];
+
+	snprintf(num, sizeof(num), "%lu", v);
+	json_raw(w, num);
+}
+
+static void json_int(struct json_writer *w, int v)
+{
+	char num[24];
+
+	snprintf(num, sizeof(num), "%d", v);
+	json_raw(w, num);
+}
+
+/* Room for the status JSON with every string at its longest, fully escaped. */
+#define STATUS_MAX 512
+
+static void publish_status(struct node_core *core)
+{
+	char payload[STATUS_MAX];
+	struct json_writer w = {.buf = payload, .size = sizeof(payload)};
+	int rssi;
+
+	json_putc(&w, '{');
+	json_key(&w, "node_id");
+	json_string(&w, core->id);
+	if (core->friendly_name[0] != '\0') {
+		json_key(&w, "name");
+		json_string(&w, core->friendly_name);
+	}
+	json_key(&w, "fw_version");
+	json_string(&w, core->info.fw_version);
+	json_key(&w, "uptime_s");
+	json_unsigned(&w, (unsigned long)(core->now_ms / 1000));
+	json_key(&w, "network");
+	json_string(&w, core->wifi_ssid);
+	json_key(&w, "rssi");
+	if (core->ports->wifi_rssi(core->ports->ctx, &rssi) == 0) {
+		json_int(&w, rssi);
+	} else {
+		json_raw(&w, "null");
+	}
+	json_key(&w, "free_heap");
+	json_unsigned(&w, (unsigned long)core->ports->free_memory(core->ports->ctx));
+	json_putc(&w, '}');
+
+	if (!w.overflow) {
+		publish(core, "status", payload, false);
+	}
+	core->broker_timeout_ms = core->now_ms + NODE_STATUS_INTERVAL_MS;
+}
+
+static void on_broker_connected(struct node_core *core)
+{
+	if (core->broker_state == NODE_BROKER_IDLE) {
+		return;
+	}
+	core->broker_state = NODE_BROKER_CONNECTED;
+	publish(core, "availability", "online", true);
+	publish_status(core);
+}
+
+static void on_broker_disconnected(struct node_core *core)
+{
+	if (core->broker_state == NODE_BROKER_CONNECTING ||
+	    core->broker_state == NODE_BROKER_CONNECTED) {
+		core->broker_state = NODE_BROKER_RETRY_WAIT;
+		core->broker_timeout_ms = core->now_ms + NODE_BROKER_RETRY_INTERVAL_MS;
+	}
+}
+
+/* Connect to the Broker when there is one and Wi-Fi is up. */
+static void broker_update(struct node_core *core)
+{
+	bool wanted = core->started && core->wifi_state == NODE_WIFI_CONNECTED &&
+		      core->broker.host[0] != '\0';
+
+	if (wanted && core->broker_state == NODE_BROKER_IDLE) {
+		broker_connect(core);
+	} else if (!wanted && core->broker_state != NODE_BROKER_IDLE) {
+		broker_disconnect(core, false);
+	}
 }
 
 /* strlen, but stops counting at max + 1 (strnlen isn't ISO C). */
@@ -217,13 +430,18 @@ void node_core_handle_event(struct node_core *core, const struct node_event *eve
 			core->wifi_retry_ms = core->now_ms + NODE_WIFI_RETRY_INTERVAL_MS;
 		}
 		break;
+	case NODE_EVENT_BROKER_CONNECTED:
+		on_broker_connected(core);
+		break;
+	case NODE_EVENT_BROKER_DISCONNECTED:
+		on_broker_disconnected(core);
+		break;
 	}
+	broker_update(core);
 }
 
-void node_core_tick(struct node_core *core, int64_t now_ms)
+static void wifi_tick(struct node_core *core, int64_t now_ms)
 {
-	core->now_ms = now_ms;
-
 	if (now_ms < core->wifi_timeout_ms) {
 		if (core->wifi_state == NODE_WIFI_JOIN_RETRY_WAIT && now_ms >= core->wifi_retry_ms) {
 			request_join(core);
@@ -246,6 +464,35 @@ void node_core_tick(struct node_core *core, int64_t now_ms)
 	case NODE_WIFI_CONNECTED:
 		break;
 	}
+}
+
+static void broker_tick(struct node_core *core, int64_t now_ms)
+{
+	if (now_ms < core->broker_timeout_ms) {
+		return;
+	}
+
+	switch (core->broker_state) {
+	case NODE_BROKER_IDLE:
+		break;
+	case NODE_BROKER_CONNECTING:
+		broker_disconnect(core, true);
+		break;
+	case NODE_BROKER_RETRY_WAIT:
+		broker_connect(core);
+		break;
+	case NODE_BROKER_CONNECTED:
+		publish_status(core);
+		break;
+	}
+}
+
+void node_core_tick(struct node_core *core, int64_t now_ms)
+{
+	core->now_ms = now_ms;
+	wifi_tick(core, now_ms);
+	broker_tick(core, now_ms);
+	broker_update(core);
 }
 
 void node_core_start(struct node_core *core)
@@ -314,7 +561,75 @@ const char *node_core_current_network(const struct node_core *core)
 	return core->wifi_state == NODE_WIFI_CONNECTED ? core->wifi_ssid : NULL;
 }
 
+const char *node_core_id(const struct node_core *core)
+{
+	return core->id;
+}
+
 const char *node_core_fw_version(const struct node_core *core)
 {
 	return core->info.fw_version;
+}
+
+static bool is_valid_broker(const struct node_broker *b)
+{
+	return bounded_strlen(b->host, NODE_BROKER_HOST_MAX_LEN) <= NODE_BROKER_HOST_MAX_LEN &&
+	       bounded_strlen(b->username, NODE_BROKER_USERNAME_MAX_LEN) <=
+		       NODE_BROKER_USERNAME_MAX_LEN &&
+	       bounded_strlen(b->password, NODE_BROKER_PASSWORD_MAX_LEN) <=
+		       NODE_BROKER_PASSWORD_MAX_LEN &&
+	       b->port != 0 && (b->password[0] == '\0' || b->username[0] != '\0');
+}
+
+int node_core_set_broker(struct node_core *core, const struct node_broker *broker)
+{
+	if (!is_valid_broker(broker)) {
+		return -EINVAL;
+	}
+
+	struct node_broker *b = &core->broker;
+	bool same = strcmp(b->host, broker->host) == 0 && b->port == broker->port &&
+		    strcmp(b->username, broker->username) == 0 &&
+		    strcmp(b->password, broker->password) == 0;
+
+	if (same) {
+		return 0;
+	}
+
+	memset(b, 0, sizeof(*b));
+	strcpy(b->host, broker->host);
+	b->port = broker->port;
+	strcpy(b->username, broker->username);
+	strcpy(b->password, broker->password);
+
+	if (core->broker_state != NODE_BROKER_IDLE) {
+		broker_disconnect(core, false);
+	}
+	broker_update(core);
+	return 0;
+}
+
+int node_core_set_friendly_name(struct node_core *core, const char *name)
+{
+	if (bounded_strlen(name, NODE_FRIENDLY_NAME_MAX_LEN) > NODE_FRIENDLY_NAME_MAX_LEN) {
+		return -EINVAL;
+	}
+	memset(core->friendly_name, 0, sizeof(core->friendly_name));
+	strcpy(core->friendly_name, name);
+	return 0;
+}
+
+const char *node_core_friendly_name(const struct node_core *core)
+{
+	return core->friendly_name;
+}
+
+const struct node_broker *node_core_broker(const struct node_core *core)
+{
+	return &core->broker;
+}
+
+bool node_core_broker_connected(const struct node_core *core)
+{
+	return core->broker_state == NODE_BROKER_CONNECTED;
 }

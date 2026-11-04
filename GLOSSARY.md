@@ -8,6 +8,10 @@ Firmware for a generic, always-powered IoT node that gathers readings from attac
 One device running g2labs-node firmware. Its attached hardware varies per installation and is configured, not hard-coded.
 _Avoid_: Device, board, gateway
 
+**Node ID**:
+A Node's unique, unchanging identifier: its Wi-Fi MAC address as 12 lowercase hex digits. Used as the MQTT client ID and in the Node's topics. A Node can also have a friendly name, which is only a label.
+_Avoid_: Device ID, serial, hostname
+
 **Broker**:
 The self-hosted MQTT server that Nodes publish to and receive commands from.
 _Avoid_: Cloud, server, backend

@@ -4,9 +4,9 @@
  *
  * All of the Node's decision-making lives here. The core never calls Zephyr
  * Wi-Fi, Bluetooth, MQTT or MCUboot APIs: it is driven by inputs (start-up,
- * and later platform events and settings) and acts only through the output
- * ports in struct node_ports, which platform adapters implement on hardware
- * and fakes implement in tests.
+ * the time, platform events and settings) and acts only through the ports in
+ * struct node_ports, which platform adapters implement on hardware and fakes
+ * implement in tests.
  */
 #ifndef NODE_CORE_H
 #define NODE_CORE_H
@@ -20,14 +20,52 @@
 extern "C" {
 #endif
 
-/* Outputs of the core. Each returns 0 on success or a negative error code. */
+/* How to reach the Broker, for the mqtt_connect port. */
+struct node_mqtt_connect {
+	const char *host;
+	uint16_t port;
+	const char *client_id;
+	/* NULL to connect anonymously. */
+	const char *username;
+	/* NULL for no password; only set together with a username. */
+	const char *password;
+	/* The last will the Broker publishes if the Node drops off. */
+	const char *will_topic;
+	const char *will_payload;
+	bool will_retained;
+};
+
+/*
+ * Outputs of the core, and the few facts it queries from the platform. Each
+ * returns 0 on success or a negative error code, unless stated otherwise.
+ */
 struct node_ports {
 	/* Opaque adapter context, passed back to every port. */
 	void *ctx;
 
-	/* MQTT adapter: publish a message to the Broker. */
+	/*
+	 * MQTT adapter: connect to the Broker, dropping any current connection.
+	 * Returns at once; the outcome arrives as NODE_EVENT_BROKER_CONNECTED or
+	 * NODE_EVENT_BROKER_DISCONNECTED. The strings in `params` are valid only
+	 * during the call.
+	 */
+	int (*mqtt_connect)(void *ctx, const struct node_mqtt_connect *params);
+
+	/*
+	 * MQTT adapter: close the Broker connection, or abandon a connect. No
+	 * further events are reported for that connection.
+	 */
+	int (*mqtt_disconnect)(void *ctx);
+
+	/* MQTT adapter: publish a message to the Broker (QoS 0). */
 	int (*mqtt_publish)(void *ctx, const char *topic, const void *payload, size_t len,
 			    bool retained);
+
+	/* Wi-Fi adapter: the RSSI of the current link, in dBm. */
+	int (*wifi_rssi)(void *ctx, int *rssi);
+
+	/* Free heap memory, in bytes. */
+	size_t (*free_memory)(void *ctx);
 
 	/* Wi-Fi adapter: start a Wi-Fi scan. */
 	int (*wifi_scan)(void *ctx);
@@ -68,6 +106,38 @@ struct node_ports {
 /* SCAN: how long a scan may run before the Node stops waiting for it. */
 #define NODE_WIFI_SCAN_TIMEOUT_MS      10000
 
+/*
+ * Broker settings. The host is a name or IPv4 address; an empty host means no
+ * Broker is configured. An empty username connects anonymously.
+ */
+#define NODE_BROKER_HOST_MAX_LEN     64
+#define NODE_BROKER_USERNAME_MAX_LEN 64
+#define NODE_BROKER_PASSWORD_MAX_LEN 64
+#define NODE_BROKER_DEFAULT_PORT     1883
+#define NODE_FRIENDLY_NAME_MAX_LEN   32
+
+/* A Node ID: the Wi-Fi MAC address as 12 lowercase hex digits. */
+#define NODE_ID_LEN  12
+#define NODE_MAC_LEN 6
+
+/*
+ * Broker timeouts, in milliseconds.
+ *
+ * CONNECT: how long a connect may take before the Node abandons it.
+ */
+#define NODE_BROKER_CONNECT_TIMEOUT_MS 30000
+/* RETRY: the pause before connecting again after a failure or disconnect. */
+#define NODE_BROKER_RETRY_INTERVAL_MS  10000
+/* STATUS: how often the Node publishes its status while connected. */
+#define NODE_STATUS_INTERVAL_MS        60000
+
+struct node_broker {
+	char host[NODE_BROKER_HOST_MAX_LEN + 1];
+	uint16_t port;
+	char username[NODE_BROKER_USERNAME_MAX_LEN + 1];
+	char password[NODE_BROKER_PASSWORD_MAX_LEN + 1];
+};
+
 /* A Wi-Fi network the Node is allowed to join. */
 struct node_known_network {
 	char ssid[NODE_SSID_MAX_LEN + 1];
@@ -86,6 +156,10 @@ enum node_event_type {
 	NODE_EVENT_WIFI_CONNECTED,
 	/* Not on a network any more, or the join failed. */
 	NODE_EVENT_WIFI_DISCONNECTED,
+	/* The Broker accepted the connection the core asked for. */
+	NODE_EVENT_BROKER_CONNECTED,
+	/* The Broker connection failed or was lost. */
+	NODE_EVENT_BROKER_DISCONNECTED,
 };
 
 struct node_event {
@@ -101,6 +175,8 @@ struct node_event {
 /* Facts about this Node fixed at build or boot time. */
 struct node_info {
 	const char *fw_version;
+	/* The Wi-Fi MAC address, from which the Node ID is derived. */
+	uint8_t mac[NODE_MAC_LEN];
 };
 
 /* What the Node is doing about Wi-Fi. */
@@ -115,6 +191,16 @@ enum node_wifi_state {
 	/* The join failed; trying the same network again shortly. */
 	NODE_WIFI_JOIN_RETRY_WAIT,
 	NODE_WIFI_CONNECTED,
+};
+
+/* What the Node is doing about the Broker. */
+enum node_broker_state {
+	/* Not connected and not trying: no Wi-Fi or no Broker configured. */
+	NODE_BROKER_IDLE,
+	NODE_BROKER_CONNECTING,
+	/* The connection failed or dropped; connecting again shortly. */
+	NODE_BROKER_RETRY_WAIT,
+	NODE_BROKER_CONNECTED,
 };
 
 struct node_core {
@@ -146,6 +232,17 @@ struct node_core {
 	 * with known_networks; NODE_RSSI_NOT_HEARD if it wasn't heard.
 	 */
 	int heard_rssi[NODE_KNOWN_NETWORKS_MAX];
+
+	char id[NODE_ID_LEN + 1];
+	char friendly_name[NODE_FRIENDLY_NAME_MAX_LEN + 1];
+	struct node_broker broker;
+	enum node_broker_state broker_state;
+	/*
+	 * While connecting, when the connect is abandoned; while waiting to
+	 * retry, when to connect again; while connected, when the next status
+	 * is due.
+	 */
+	int64_t broker_timeout_ms;
 };
 
 /*
@@ -179,14 +276,39 @@ size_t node_core_known_network_count(const struct node_core *core);
 const char *node_core_current_network(const struct node_core *core);
 
 /*
- * Tell the core the time, in milliseconds on a monotonic clock. Call it at
- * least once a second, and once before node_core_start(); the core measures
- * its Wi-Fi timeouts from the latest time it was given.
+ * Tell the core the time, in milliseconds since boot. Call it at least once a
+ * second, and once before node_core_start(); the core measures its timeouts
+ * from the latest time it was given and reports it as uptime.
  */
 void node_core_tick(struct node_core *core, int64_t now_ms);
 
 /* Feed a platform event into the core. */
 void node_core_handle_event(struct node_core *core, const struct node_event *event);
+
+/*
+ * Set the Broker; it applies at once, reconnecting if needed. Returns 0, or
+ * -EINVAL for a host, username or password that is too long, a port of 0, or
+ * a password without a username.
+ */
+int node_core_set_broker(struct node_core *core, const struct node_broker *broker);
+
+/* The Broker settings. */
+const struct node_broker *node_core_broker(const struct node_core *core);
+
+/* Whether the Node is connected to the Broker. */
+bool node_core_broker_connected(const struct node_core *core);
+
+/*
+ * Set the friendly name reported in status; "" clears it. Returns 0, or
+ * -EINVAL if it is longer than NODE_FRIENDLY_NAME_MAX_LEN.
+ */
+int node_core_set_friendly_name(struct node_core *core, const char *name);
+
+/* The friendly name, "" when none is set. */
+const char *node_core_friendly_name(const struct node_core *core);
+
+/* The Node ID, derived from the Wi-Fi MAC address. */
+const char *node_core_id(const struct node_core *core);
 
 /* The firmware version this Node is running. */
 const char *node_core_fw_version(const struct node_core *core);

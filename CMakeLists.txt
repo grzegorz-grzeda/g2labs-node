@@ -9,7 +9,8 @@ target_sources(app PRIVATE
   src/main.c
   src/shell.c
   src/adapters/image_mcuboot.c
-  src/adapters/mqtt_stub.c
+  src/adapters/memory.c
+  src/adapters/mqtt.c
   src/adapters/settings.c
   src/adapters/wifi.c
 )

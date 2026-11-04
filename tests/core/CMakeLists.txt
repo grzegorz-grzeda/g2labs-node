@@ -10,4 +10,5 @@ target_sources(app PRIVATE
   src/test_core.c
   src/test_known_networks.c
   src/test_wifi_failover.c
+  src/test_broker.c
 )
