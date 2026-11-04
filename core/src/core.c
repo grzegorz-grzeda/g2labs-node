@@ -227,6 +227,22 @@ static void subscribe_commands(struct node_core *core)
 	}
 }
 
+/*
+ * Reaching the Broker proves the running image good enough to keep. A failed
+ * confirm is tried again on the next connection.
+ */
+static void confirm_image(struct node_core *core)
+{
+	if (core->image_confirmed) {
+		return;
+	}
+	if (core->ports->image_confirm(core->ports->ctx) == 0) {
+		core->image_confirmed = true;
+	} else {
+		warn(core, "can't confirm the running image; trying again on the next Broker connection");
+	}
+}
+
 static void on_broker_connected(struct node_core *core)
 {
 	if (core->broker_state == NODE_BROKER_IDLE) {
@@ -237,6 +253,7 @@ static void on_broker_connected(struct node_core *core)
 	publish(core, "availability", "online", true);
 	subscribe_commands(core);
 	publish_status(core);
+	confirm_image(core);
 }
 
 static void on_broker_disconnected(struct node_core *core)

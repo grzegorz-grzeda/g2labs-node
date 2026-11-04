@@ -67,6 +67,8 @@ struct fake_ports {
 	int wifi_connect_result;
 	/* Return code of the fake command subscription (0 = sent). */
 	int mqtt_subscribe_result;
+	/* Return code of the fake image confirm (0 = confirmed). */
+	int image_confirm_result;
 };
 
 /* Reset all recordings and wire the fake into fake->ports. */

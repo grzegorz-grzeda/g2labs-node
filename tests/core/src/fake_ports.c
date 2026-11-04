@@ -203,7 +203,7 @@ static int fake_image_confirm(void *ctx)
 	struct fake_ports *fake = ctx;
 
 	fake->image_confirm_count++;
-	return 0;
+	return fake->image_confirm_result;
 }
 
 void fake_ports_init(struct fake_ports *fake)
