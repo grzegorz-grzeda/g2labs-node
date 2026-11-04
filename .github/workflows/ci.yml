@@ -16,8 +16,9 @@ env:
   # the local workspace (`git -C ~/zephyrproject/zephyr rev-parse HEAD`).
   ZEPHYR_REVISION: decee24b4fbc5aa221194cde98bb183639840de8
   ZEPHYR_SDK_VERSION: 1.0.1
-  # Only the west modules the Node's builds and tests use.
-  WEST_PROJECT_FILTER: -.*,+hal_espressif,+mcuboot,+mbedtls,+tf-psa-crypto
+  # Only the west modules the Node's builds and tests use (hostap provides
+  # legacy mbedtls sources the ESP32 Wi-Fi driver still needs).
+  WEST_PROJECT_FILTER: -.*,+hal_espressif,+hostap,+mcuboot,+mbedtls,+tf-psa-crypto
   ZEPHYR_BASE: ${{ github.workspace }}/ws/zephyr
 
 jobs:
