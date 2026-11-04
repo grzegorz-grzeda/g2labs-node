@@ -8,7 +8,10 @@
       "publisher": "node",
       "retained": true,
       "encoding": "text",
-      "values": ["online", "offline"],
+      "values": [
+        "online",
+        "offline"
+      ],
       "examples": "examples/availability",
       "meaning": "Whether the Node is connected to the Broker; offline is also its last will."
     },
@@ -22,11 +25,23 @@
       "meaning": "The Node's Status, right after online and then every 60 s."
     },
     {
+      "pattern": "g2labs/<node-id>/command",
+      "publisher": "hub",
+      "retained": false,
+      "encoding": "json",
+      "schema": "schemas/command.schema.json",
+      "examples": "examples/command",
+      "meaning": "A command to the Node: Reboot or Publish status. Sent by the Hub, or by the Home Assistant buttons it announces; the Node ignores retained ones."
+    },
+    {
       "pattern": "g2labs/hub/availability",
       "publisher": "hub",
       "retained": true,
       "encoding": "text",
-      "values": ["online", "offline"],
+      "values": [
+        "online",
+        "offline"
+      ],
       "examples": "examples/hub-availability",
       "meaning": "Whether the Hub is connected to the Broker; offline is also its last will."
     }

@@ -25,6 +25,7 @@ Every topic of a Node's own sits under `g2labs/<node-id>/`.
 |---|---|---|
 | `g2labs/<node-id>/availability` | yes | `online` or `offline` (plain text) |
 | `g2labs/<node-id>/status` | no | status JSON, below |
+| `g2labs/<node-id>/command` | no | command JSON, below; the Node subscribes, the Hub and Home Assistant publish |
 
 ### `availability`
 
@@ -57,6 +58,27 @@ Published right after `online`, then every 60 s while connected.
 | `free_heap` | integer | Free heap memory in bytes, summed over all heaps. |
 
 Consumers must ignore fields they don't know: later tickets add fields (for example the Sighting drop count). The Node itself never sends a field that isn't in `contract/schemas/status.schema.json`.
+
+### `command`
+
+The Node subscribes to its command topic (QoS 0) every time it connects. Publish a command to it, not retained:
+
+```json
+{"command": "reboot"}
+```
+
+| `command` | What the Node does |
+|---|---|
+| `reboot` | Publishes `offline` on `availability`, disconnects, and reboots 1 s later. It comes back `online` as usual. |
+| `publish_status` | Publishes its `status` at once. The periodic status then follows 60 s after it. |
+
+The payload is a JSON object of at most 128 bytes. The Node ignores members it doesn't know, so later commands can carry more fields. It ignores and logs (on the UART console) every other message on the topic, and none of these can crash it:
+
+- an unknown command name;
+- a malformed payload: not a JSON object, no string `command` member, `command` given twice, or longer than 128 bytes;
+- a retained message, so that a stray retained `reboot` can't reboot the Node every time it connects.
+
+Commands get no reply; watch `availability` or `status` for the effect.
 
 ## The Hub
 

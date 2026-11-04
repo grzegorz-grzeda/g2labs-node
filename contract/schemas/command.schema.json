@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Command",
+  "description": "A command to one Node, on g2labs/<node-id>/command. At most 128 bytes.",
+  "type": "object",
+  "properties": {
+    "command": {
+      "description": "What the Node should do: reboot, or publish its Status now.",
+      "type": "string",
+      "enum": ["reboot", "publish_status"]
+    }
+  },
+  "required": ["command"],
+  "additionalProperties": false
+}

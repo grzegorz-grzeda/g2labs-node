@@ -51,6 +51,11 @@ struct fake_ports {
 	size_t mqtt_connect_count;
 	struct fake_mqtt_connect last_mqtt_connect;
 	size_t mqtt_disconnect_count;
+	size_t mqtt_subscribe_count;
+	char last_subscribe_topic[FAKE_TOPIC_MAX];
+	size_t reboot_count;
+	size_t warning_count;
+	char last_warning[FAKE_PAYLOAD_MAX];
 
 	/* What the fake platform reports: link RSSI (or rssi_result), free memory. */
 	int rssi;

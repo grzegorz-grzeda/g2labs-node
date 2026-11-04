@@ -133,6 +133,30 @@ static int fake_mqtt_disconnect(void *ctx)
 	return 0;
 }
 
+static int fake_mqtt_subscribe(void *ctx, const char *topic)
+{
+	struct fake_ports *fake = ctx;
+
+	fake->mqtt_subscribe_count++;
+	copy(fake->last_subscribe_topic, sizeof(fake->last_subscribe_topic), topic);
+	return 0;
+}
+
+static void fake_reboot(void *ctx)
+{
+	struct fake_ports *fake = ctx;
+
+	fake->reboot_count++;
+}
+
+static void fake_log_warning(void *ctx, const char *message)
+{
+	struct fake_ports *fake = ctx;
+
+	fake->warning_count++;
+	copy(fake->last_warning, sizeof(fake->last_warning), message);
+}
+
 static int fake_wifi_rssi(void *ctx, int *rssi)
 {
 	struct fake_ports *fake = ctx;
@@ -190,11 +214,14 @@ void fake_ports_init(struct fake_ports *fake)
 		.mqtt_connect = fake_mqtt_connect,
 		.mqtt_disconnect = fake_mqtt_disconnect,
 		.mqtt_publish = fake_mqtt_publish,
+		.mqtt_subscribe = fake_mqtt_subscribe,
 		.wifi_rssi = fake_wifi_rssi,
 		.free_memory = fake_free_memory,
 		.wifi_scan = fake_wifi_scan,
 		.wifi_connect = fake_wifi_connect,
 		.wifi_disconnect = fake_wifi_disconnect,
 		.image_confirm = fake_image_confirm,
+		.reboot = fake_reboot,
+		.log_warning = fake_log_warning,
 	};
 }

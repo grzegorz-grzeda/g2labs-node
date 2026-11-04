@@ -204,6 +204,268 @@ static void publish_status(struct node_core *core)
 	core->broker_timeout_ms = core->now_ms + NODE_STATUS_INTERVAL_MS;
 }
 
+/*
+ * Reads a command payload, a JSON object, from a buffer that isn't
+ * NUL-terminated. Each function returns false on malformed input.
+ */
+struct json_reader {
+	const char *p;
+	const char *end;
+};
+
+/* Nesting allowed inside a command payload, in members the Node ignores. */
+#define JSON_MAX_DEPTH 8
+
+static void json_skip_space(struct json_reader *r)
+{
+	while (r->p < r->end && (*r->p == ' ' || *r->p == '\t' || *r->p == '\n' || *r->p == '\r')) {
+		r->p++;
+	}
+}
+
+/* Consume `c`, after any whitespace. */
+static bool json_expect(struct json_reader *r, char c)
+{
+	json_skip_space(r);
+	if (r->p < r->end && *r->p == c) {
+		r->p++;
+		return true;
+	}
+	return false;
+}
+
+static int hex_value(char c)
+{
+	if (c >= '0' && c <= '9') {
+		return c - '0';
+	}
+	if (c >= 'a' && c <= 'f') {
+		return c - 'a' + 10;
+	}
+	if (c >= 'A' && c <= 'F') {
+		return c - 'A' + 10;
+	}
+	return -1;
+}
+
+/*
+ * A string, decoded into `out` (NUL-terminated; it must hold the whole
+ * payload), or skipped when `out` is NULL. Escapes that don't stand for a
+ * printable ASCII character decode to DEL, which no command name contains.
+ */
+static bool json_read_string(struct json_reader *r, char *out)
+{
+	size_t n = 0;
+
+	if (!json_expect(r, '"')) {
+		return false;
+	}
+	while (r->p < r->end && *r->p != '"') {
+		unsigned char c = (unsigned char)*r->p++;
+
+		if (c < 0x20) {
+			return false;
+		}
+		if (c == '\\') {
+			if (r->p == r->end) {
+				return false;
+			}
+			c = (unsigned char)*r->p++;
+			switch (c) {
+			case '"':
+			case '\\':
+			case '/':
+				break;
+			case 'b':
+			case 'f':
+			case 'n':
+			case 'r':
+			case 't':
+				c = 0x7f;
+				break;
+			case 'u': {
+				unsigned int v = 0;
+
+				for (int i = 0; i < 4; i++) {
+					int h = r->p < r->end ? hex_value(*r->p++) : -1;
+
+					if (h < 0) {
+						return false;
+					}
+					v = v << 4 | (unsigned int)h;
+				}
+				c = v >= 0x20 && v < 0x7f ? (unsigned char)v : 0x7f;
+				break;
+			}
+			default:
+				return false;
+			}
+		}
+		if (out != NULL) {
+			out[n++] = (char)c;
+		}
+	}
+	if (out != NULL) {
+		out[n] = '\0';
+	}
+	return json_expect(r, '"');
+}
+
+static bool json_skip_value(struct json_reader *r, int depth);
+
+/* The members of an object or the items of an array, up to `close`. */
+static bool json_skip_container(struct json_reader *r, char close, int depth)
+{
+	if (json_expect(r, close)) {
+		return true;
+	}
+	do {
+		if (close == '}' && (!json_read_string(r, NULL) || !json_expect(r, ':'))) {
+			return false;
+		}
+		if (!json_skip_value(r, depth)) {
+			return false;
+		}
+	} while (json_expect(r, ','));
+	return json_expect(r, close);
+}
+
+static bool json_skip_literal(struct json_reader *r, const char *literal)
+{
+	size_t len = strlen(literal);
+
+	if ((size_t)(r->end - r->p) < len || memcmp(r->p, literal, len) != 0) {
+		return false;
+	}
+	r->p += len;
+	return true;
+}
+
+/* Any value, checked only loosely: the Node ignores members it doesn't know. */
+static bool json_skip_value(struct json_reader *r, int depth)
+{
+	json_skip_space(r);
+	if (r->p == r->end || depth > JSON_MAX_DEPTH) {
+		return false;
+	}
+	switch (*r->p) {
+	case '"':
+		return json_read_string(r, NULL);
+	case '{':
+		r->p++;
+		return json_skip_container(r, '}', depth + 1);
+	case '[':
+		r->p++;
+		return json_skip_container(r, ']', depth + 1);
+	case 't':
+		return json_skip_literal(r, "true");
+	case 'f':
+		return json_skip_literal(r, "false");
+	case 'n':
+		return json_skip_literal(r, "null");
+	default: {
+		const char *start = r->p;
+
+		while (r->p < r->end && strchr("+-.0123456789eE", *r->p) != NULL) {
+			r->p++;
+		}
+		return r->p != start;
+	}
+	}
+}
+
+/*
+ * The command name from a command payload, {"command": "<name>"} plus any
+ * members the Node doesn't know. `name` holds NODE_COMMAND_MAX_LEN + 1.
+ */
+static bool parse_command(const char *payload, size_t len, char *name)
+{
+	struct json_reader r = {.p = payload, .end = payload + len};
+	char key[NODE_COMMAND_MAX_LEN + 1];
+	bool found = false;
+
+	if (!json_expect(&r, '{')) {
+		return false;
+	}
+	if (!json_expect(&r, '}')) {
+		do {
+			if (!json_read_string(&r, key) || !json_expect(&r, ':')) {
+				return false;
+			}
+			if (strcmp(key, "command") == 0) {
+				json_skip_space(&r);
+				if (found || !json_read_string(&r, name)) {
+					return false;
+				}
+				found = true;
+			} else if (!json_skip_value(&r, 1)) {
+				return false;
+			}
+		} while (json_expect(&r, ','));
+		if (!json_expect(&r, '}')) {
+			return false;
+		}
+	}
+	json_skip_space(&r);
+	return found && r.p == r.end;
+}
+
+/* Room for a warning naming an unknown command; a long name is cut short. */
+#define WARNING_MAX 160
+
+static void warn(struct node_core *core, const char *message)
+{
+	core->ports->log_warning(core->ports->ctx, message);
+}
+
+static void warn_unknown_command(struct node_core *core, const char *name)
+{
+	char message[WARNING_MAX];
+	struct json_writer w = {.buf = message, .size = sizeof(message)};
+
+	json_raw(&w, "ignored unknown command ");
+	json_string(&w, name);
+	warn(core, message);
+}
+
+static void on_command(struct node_core *core, const struct node_event *event)
+{
+	char name[NODE_COMMAND_MAX_LEN + 1];
+
+	if (core->broker_state != NODE_BROKER_CONNECTED) {
+		/* Queued before the connection went: not meant for now. */
+		return;
+	}
+	if (event->command.retained) {
+		/* A retained Reboot would reboot the Node on every connect. */
+		warn(core, "ignored a retained command");
+		return;
+	}
+	if (event->command.truncated || event->command.len > NODE_COMMAND_MAX_LEN ||
+	    !parse_command(event->command.payload, event->command.len, name)) {
+		warn(core, "ignored a malformed command");
+		return;
+	}
+	if (strcmp(name, "publish_status") == 0) {
+		publish_status(core);
+	} else if (strcmp(name, "reboot") == 0) {
+		/* Say offline and leave cleanly; the reboot waits for it to get out. */
+		core->reboot_pending = true;
+		core->reboot_at_ms = core->now_ms + NODE_REBOOT_DELAY_MS;
+		broker_disconnect(core, false);
+	} else {
+		warn_unknown_command(core, name);
+	}
+}
+
+static void subscribe_commands(struct node_core *core)
+{
+	char topic[TOPIC_MAX];
+
+	node_topic(core, topic, "command");
+	(void)core->ports->mqtt_subscribe(core->ports->ctx, topic);
+}
+
 static void on_broker_connected(struct node_core *core)
 {
 	if (core->broker_state == NODE_BROKER_IDLE) {
@@ -212,6 +474,7 @@ static void on_broker_connected(struct node_core *core)
 	core->broker_state = NODE_BROKER_CONNECTED;
 	core->broker_outage = false;
 	publish(core, "availability", "online", true);
+	subscribe_commands(core);
 	publish_status(core);
 }
 
@@ -230,8 +493,8 @@ static void on_broker_disconnected(struct node_core *core)
 /* Connect to the Broker when there is one and Wi-Fi is up. */
 static void broker_update(struct node_core *core)
 {
-	bool wanted = core->started && core->wifi_state == NODE_WIFI_CONNECTED &&
-		      core->broker.host[0] != '\0';
+	bool wanted = core->started && !core->reboot_pending &&
+		      core->wifi_state == NODE_WIFI_CONNECTED && core->broker.host[0] != '\0';
 
 	if (wanted && core->broker_state == NODE_BROKER_IDLE) {
 		if (!core->broker_outage) {
@@ -455,6 +718,9 @@ void node_core_handle_event(struct node_core *core, const struct node_event *eve
 	case NODE_EVENT_BROKER_DISCONNECTED:
 		on_broker_disconnected(core);
 		break;
+	case NODE_EVENT_COMMAND:
+		on_command(core, event);
+		break;
 	}
 	broker_update(core);
 }
@@ -529,9 +795,18 @@ static void broker_failover_tick(struct node_core *core, int64_t now_ms)
 	broker_update(core);
 }
 
+static void reboot_tick(struct node_core *core, int64_t now_ms)
+{
+	if (core->reboot_pending && now_ms >= core->reboot_at_ms) {
+		core->reboot_at_ms = INT64_MAX;
+		core->ports->reboot(core->ports->ctx);
+	}
+}
+
 void node_core_tick(struct node_core *core, int64_t now_ms)
 {
 	core->now_ms = now_ms;
+	reboot_tick(core, now_ms);
 	wifi_tick(core, now_ms);
 	broker_failover_tick(core, now_ms);
 	broker_tick(core, now_ms);

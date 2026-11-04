@@ -12,6 +12,7 @@ target_sources(app PRIVATE
   src/test_wifi_failover.c
   src/test_broker.c
   src/test_broker_failover.c
+  src/test_commands.c
 )
 
 # Host side of the fake ports' publish dump (needs the host's stdio).

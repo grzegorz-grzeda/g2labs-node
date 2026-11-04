@@ -8,6 +8,9 @@
  * to the core. The core's connect and disconnect requests only hand that
  * thread new work, so they never block the core. Every request starts a new
  * session; events from an older session are not reported.
+ *
+ * Messages arrive only on the command topic the core subscribed to; the
+ * thread reads each one and reports it as NODE_EVENT_COMMAND.
  */
 #include "adapters.h"
 
@@ -66,6 +69,9 @@ static struct mqtt_topic will_topic;
 static struct mqtt_utf8 will_message;
 static K_MUTEX_DEFINE(client_lock);
 
+/* The topic the core subscribed to. Guarded by client_lock. */
+static char command_topic[TOPIC_MAX];
+
 /*
  * Connected to the Broker: publishes may go out. It stays set until the
  * thread notices a new request, so a publish made just before the core's
@@ -94,10 +100,52 @@ static void report(uint32_t session, enum node_event_type type)
 	}
 }
 
+static bool is_command_topic(const struct mqtt_utf8 *topic)
+{
+	return topic->size == strlen(command_topic) &&
+	       memcmp(topic->utf8, command_topic, topic->size) == 0;
+}
+
+/*
+ * A message arrived: read all of its payload, as the client requires, and
+ * report it as a command. Runs in mqtt_input(), holding client_lock.
+ */
+static void on_publish(struct mqtt_client *c, const struct mqtt_publish_param *pub)
+{
+	struct node_event event = {.type = NODE_EVENT_COMMAND};
+	const struct mqtt_utf8 *topic = &pub->message.topic.topic;
+	/* Check the topic first: it lives in rx_buf, read before the payload. */
+	bool is_command = is_command_topic(topic);
+	uint32_t len = pub->message.payload.len;
+	size_t keep = MIN(len, sizeof(event.command.payload));
+	uint8_t discard[32];
+
+	if (!is_command) {
+		LOG_WRN("ignored a message on %.*s", (int)topic->size, (const char *)topic->utf8);
+	}
+	int err = mqtt_readall_publish_payload(c, (uint8_t *)event.command.payload, keep);
+
+	for (uint32_t left = len - keep; err == 0 && left > 0;) {
+		size_t n = MIN(left, sizeof(discard));
+
+		err = mqtt_readall_publish_payload(c, discard, n);
+		left -= n;
+	}
+	if (err) {
+		LOG_WRN("reading a message failed: %d", err);
+		return;
+	}
+	if (!is_command || !is_current(current.session)) {
+		return;
+	}
+	event.command.len = keep;
+	event.command.truncated = len > keep;
+	event.command.retained = pub->retain_flag;
+	app_post_event(&event);
+}
+
 static void mqtt_event_handler(struct mqtt_client *c, const struct mqtt_evt *evt)
 {
-	ARG_UNUSED(c);
-
 	switch (evt->type) {
 	case MQTT_EVT_CONNACK:
 		if (evt->result == 0) {
@@ -109,6 +157,14 @@ static void mqtt_event_handler(struct mqtt_client *c, const struct mqtt_evt *evt
 		break;
 	case MQTT_EVT_DISCONNECT:
 		connection_closed = true;
+		break;
+	case MQTT_EVT_PUBLISH:
+		if (evt->result == 0) {
+			on_publish(c, &evt->param.publish);
+		}
+		break;
+	case MQTT_EVT_SUBACK:
+		LOG_INF("subscribed to commands");
 		break;
 	default:
 		break;
@@ -341,6 +397,39 @@ int mqtt_adapter_publish(void *ctx, const char *topic, const void *payload, size
 
 	if (err) {
 		LOG_WRN("publish to %s failed: %d", topic, err);
+	}
+	return err;
+}
+
+int mqtt_adapter_subscribe(void *ctx, const char *topic)
+{
+	ARG_UNUSED(ctx);
+	static uint16_t message_id;
+
+	if (!atomic_get(&connected)) {
+		return -ENOTCONN;
+	}
+
+	k_mutex_lock(&client_lock, K_FOREVER);
+	copy(command_topic, sizeof(command_topic), topic);
+
+	const struct mqtt_topic subscription = {
+		.topic = utf8(command_topic),
+		.qos = MQTT_QOS_0_AT_MOST_ONCE,
+	};
+	/* Message IDs must not be 0. */
+	message_id = message_id == UINT16_MAX ? 1 : message_id + 1;
+	const struct mqtt_subscription_list list = {
+		.list = &subscription,
+		.list_count = 1,
+		.message_id = message_id,
+	};
+	int err = mqtt_subscribe(&client, &list);
+
+	k_mutex_unlock(&client_lock);
+
+	if (err) {
+		LOG_WRN("subscribing to %s failed: %d", topic, err);
 	}
 	return err;
 }
