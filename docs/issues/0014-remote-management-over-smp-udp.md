@@ -6,6 +6,7 @@ labels: [ready-for-agent]
 parent: 1
 blocked_by: [4]
 created: 2026-11-04
+assignee: claude
 ---
 
 # Remote management over SMP-UDP
