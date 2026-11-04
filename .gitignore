@@ -57,3 +57,9 @@ dkms.conf
 # Zephyr build and twister output
 /build*/
 /twister-out*/
+
+# Provisioning files hold plaintext passwords
+*.provision.toml
+
+# Python bytecode
+__pycache__/

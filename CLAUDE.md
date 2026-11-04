@@ -58,6 +58,15 @@ west build -d build-c6 -t menuconfig                                      # inte
 
 `west espressif monitor` also works, but only for the default `build/` dir (it has no `-d` option).
 
+`scripts/g2labs-node.py` wraps all of this. Run it from the activated venv (`~/zephyrproject/.venv`). Its subcommands are `build`, `flash` (build, flash, then monitor) and `monitor`. It also mirrors the Node's `node …` shell commands (`version`, `id`, `name`, `network`, `broker`) and adds `show`, a summary of them all. `provision` applies a Provisioning file, which is TOML; `provision --help` shows the format. `--port` defaults to the only `/dev/ttyACM*`/`/dev/ttyUSB*`, else `/dev/ttyACM0`. Opening the port leaves DTR/RTS as they are, because changing them resets the Node. Provisioning files hold plaintext passwords; `*.provision.toml` is git-ignored.
+
+```bash
+scripts/g2labs-node.py flash --board c6                # build, flash, open the shell (quit: Ctrl-])
+scripts/g2labs-node.py show                            # version, Node ID, Known Networks, Broker
+scripts/g2labs-node.py network add home                # prompts for the password
+scripts/g2labs-node.py provision kitchen.provision.toml --dry-run
+```
+
 ## Test commands
 
 Core tests run on `native_sim` under twister (needs host gcc with 32-bit support):

@@ -20,6 +20,10 @@ _Avoid_: Cloud, server, backend
 A Wi-Fi network (SSID and password) stored on a Node that it is allowed to join.
 _Avoid_: Saved network, profile, credential
 
+**Provisioning**:
+Setting a Node's friendly name, Known Networks and Broker from a computer over the Node's serial shell.
+_Avoid_: Configuration, setup, onboarding
+
 **Sighting**:
 One reception of a BLE advertisement by a Node: who sent it, how strongly it was heard, and what it said. Nodes report every Sighting; filtering and deduplication happen outside the Node.
 _Avoid_: Scan result, detection, beacon, reading
