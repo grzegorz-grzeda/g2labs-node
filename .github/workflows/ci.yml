@@ -144,7 +144,8 @@ jobs:
               "const D = require('better-sqlite3'); new D(':memory:'); console.log(process.arch, 'ok')"
           done
 
-  # On a v* tag, publish the Hub's multi-arch image to GHCR.
+  # On a v* tag (a Release Candidate or a stable Release, see
+  # docs/agents/development-flow.md), publish the Hub's image to GHCR.
   hub-image:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-and-test, hub]
@@ -167,9 +168,9 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/g2labs-node-service
+          # vX.Y.Z-rcN -> X.Y.Z-rcN; vX.Y.Z -> X.Y.Z and latest.
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
 
       - uses: docker/build-push-action@v7
         with:

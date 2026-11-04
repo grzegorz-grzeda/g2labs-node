@@ -55,3 +55,15 @@ _Avoid_: OTA mode, update strategy
 **Hold**:
 A per-Node flag that excludes the Node from automatic rollouts under the Update Policy. Manual updates still apply.
 _Avoid_: Pin, freeze, exclude
+
+**Release**:
+A numbered version of the Node firmware and the Hub, published together for the fleet. A Release is stable unless it is a Release Candidate. Only a stable Release is rolled out under Follow Releases; work merged into the codebase is not a Release.
+_Avoid_: Build, deploy, update, merge
+
+**Release Candidate**:
+A Release published for testing on real hardware before a stable Release of the same version. Follow Releases skips it unless the user allows Release Candidates.
+_Avoid_: Pre-release, beta, rc build
+
+**Rollout**:
+Updating every eligible Node to one Release, one Node at a time, stopping at the first failure.
+_Avoid_: Deployment, OTA, FOTA, push

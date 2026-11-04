@@ -97,9 +97,13 @@ docker build -t g2labs-node-service .                # the container image
 
 `.github/workflows/ci.yml` runs the core tests and both sysbuild builds on every push and pull request. It recreates a minimal workspace pinned to `ZEPHYR_REVISION` (with only the west modules in `WEST_PROJECT_FILTER`) and Zephyr SDK `ZEPHYR_SDK_VERSION`. When the local workspace's Zephyr or SDK is updated, bump those values in the same change.
 
-The `hub` job builds and tests `service/` and builds its image for amd64 and arm64 (under QEMU, loading better-sqlite3 in each). On a `v*` tag, `hub-image` pushes the multi-arch image to `ghcr.io/<owner>/g2labs-node-service` (`<version>`, `<major>.<minor>`, `latest`).
+The `hub` job builds and tests `service/` and builds its image for amd64 and arm64 (under QEMU, loading better-sqlite3 in each). On a `v*` tag, `hub-image` pushes the multi-arch image to `ghcr.io/<owner>/g2labs-node-service` (a Release Candidate `vX.Y.Z-rcN` as its version only, a stable Release as its version and `latest`).
 
 ## Agent skills
+
+### Development flow
+
+Every change goes through a branch (`<kind>/<issue>-<slug>`) and a squash-merged PR that auto-merges once CI, `claude-review` and `human-gate` pass. Merging never delivers: only a stable Release, approved by the maintainer through a release PR, reaches the fleet (ADR-0006). See `docs/agents/development-flow.md`.
 
 ### Issue tracker
 
