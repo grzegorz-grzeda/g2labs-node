@@ -11,4 +11,5 @@ target_sources(app PRIVATE
   src/test_known_networks.c
   src/test_wifi_failover.c
   src/test_broker.c
+  src/test_broker_failover.c
 )

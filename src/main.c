@@ -58,7 +58,10 @@ void app_post_event(const struct node_event *event)
 
 int main(void)
 {
-	struct node_info info = {.fw_version = APP_VERSION_EXTENDED_STRING};
+	struct node_info info = {
+		.fw_version = APP_VERSION_EXTENDED_STRING,
+		.broker_failover_ms = CONFIG_NODE_BROKER_FAILOVER_S * 1000U,
+	};
 	struct node_event event;
 
 	if (wifi_adapter_mac(info.mac) != 0) {

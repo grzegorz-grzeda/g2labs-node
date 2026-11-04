@@ -28,6 +28,16 @@ void node_core_init(struct node_core *core, const struct node_ports *ports,
 	format_id(core->id, info->mac);
 }
 
+/* The Broker has just become unreachable: start counting towards failover. */
+static void start_failover_period(struct node_core *core)
+{
+	uint32_t period = core->info.broker_failover_ms != 0 ? core->info.broker_failover_ms
+							      : NODE_BROKER_FAILOVER_TIMEOUT_MS;
+
+	core->broker_outage = true;
+	core->broker_failover_deadline_ms = core->now_ms + period;
+}
+
 /* g2labs/<node-id>/<leaf>: every topic of the Node's own. */
 #define TOPIC_MAX (sizeof("g2labs//availability") + NODE_ID_LEN)
 
@@ -200,12 +210,16 @@ static void on_broker_connected(struct node_core *core)
 		return;
 	}
 	core->broker_state = NODE_BROKER_CONNECTED;
+	core->broker_outage = false;
 	publish(core, "availability", "online", true);
 	publish_status(core);
 }
 
 static void on_broker_disconnected(struct node_core *core)
 {
+	if (core->broker_state == NODE_BROKER_CONNECTED) {
+		start_failover_period(core);
+	}
 	if (core->broker_state == NODE_BROKER_CONNECTING ||
 	    core->broker_state == NODE_BROKER_CONNECTED) {
 		core->broker_state = NODE_BROKER_RETRY_WAIT;
@@ -220,6 +234,9 @@ static void broker_update(struct node_core *core)
 		      core->broker.host[0] != '\0';
 
 	if (wanted && core->broker_state == NODE_BROKER_IDLE) {
+		if (!core->broker_outage) {
+			start_failover_period(core);
+		}
 		broker_connect(core);
 	} else if (!wanted && core->broker_state != NODE_BROKER_IDLE) {
 		broker_disconnect(core, false);
@@ -377,6 +394,8 @@ static void join_strongest_heard(struct node_core *core)
 		return;
 	}
 
+	/* A network chosen by a scan gets a fresh failover period. */
+	core->broker_outage = false;
 	join(core, &core->known_networks[best]);
 }
 
@@ -487,10 +506,34 @@ static void broker_tick(struct node_core *core, int64_t now_ms)
 	}
 }
 
+/*
+ * A Known Network with no way to the Broker strands the Node: after the
+ * failover period, move to another Known Network. With only one, stay and keep
+ * retrying the Broker.
+ */
+static void broker_failover_tick(struct node_core *core, int64_t now_ms)
+{
+	bool unreachable = core->broker_state == NODE_BROKER_CONNECTING ||
+			   core->broker_state == NODE_BROKER_RETRY_WAIT;
+
+	if (!unreachable || core->wifi_state != NODE_WIFI_CONNECTED ||
+	    now_ms < core->broker_failover_deadline_ms) {
+		return;
+	}
+	if (core->known_network_count < 2) {
+		start_failover_period(core);
+		return;
+	}
+	give_up_network(core);
+	/* Drop the Broker attempt now, before broker_tick() retries it. */
+	broker_update(core);
+}
+
 void node_core_tick(struct node_core *core, int64_t now_ms)
 {
 	core->now_ms = now_ms;
 	wifi_tick(core, now_ms);
+	broker_failover_tick(core, now_ms);
 	broker_tick(core, now_ms);
 	broker_update(core);
 }
@@ -605,6 +648,8 @@ int node_core_set_broker(struct node_core *core, const struct node_broker *broke
 	if (core->broker_state != NODE_BROKER_IDLE) {
 		broker_disconnect(core, false);
 	}
+	/* A different Broker gets a fresh failover period. */
+	core->broker_outage = false;
 	broker_update(core);
 	return 0;
 }

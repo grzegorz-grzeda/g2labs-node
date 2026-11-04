@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+
+menu "g2labs-node"
+
+config NODE_BROKER_FAILOVER_S
+	int "Seconds the Broker may be unreachable before moving network"
+	default 300
+	range 60 3600
+	help
+	  How long the Node keeps retrying the Broker on the current Known
+	  Network before it rescans and moves to the strongest other one.
+	  Shorter outages only reconnect on the same network; with a single
+	  Known Network the Node stays on it.
+
+endmenu
+
+source "Kconfig.zephyr"

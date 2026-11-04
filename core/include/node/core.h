@@ -130,6 +130,8 @@ struct node_ports {
 #define NODE_BROKER_RETRY_INTERVAL_MS  10000
 /* STATUS: how often the Node publishes its status while connected. */
 #define NODE_STATUS_INTERVAL_MS        60000
+/* FAILOVER: how long the Broker may be unreachable before moving network. */
+#define NODE_BROKER_FAILOVER_TIMEOUT_MS 300000
 
 struct node_broker {
 	char host[NODE_BROKER_HOST_MAX_LEN + 1];
@@ -177,6 +179,11 @@ struct node_info {
 	const char *fw_version;
 	/* The Wi-Fi MAC address, from which the Node ID is derived. */
 	uint8_t mac[NODE_MAC_LEN];
+	/*
+	 * How long the Broker may stay unreachable before the Node moves to
+	 * another Known Network; 0 means NODE_BROKER_FAILOVER_TIMEOUT_MS.
+	 */
+	uint32_t broker_failover_ms;
 };
 
 /* What the Node is doing about Wi-Fi. */
@@ -243,6 +250,13 @@ struct node_core {
 	 * is due.
 	 */
 	int64_t broker_timeout_ms;
+	/*
+	 * The Broker is unreachable on the current network (counting survives
+	 * a Wi-Fi rejoin of the same network), and when that has gone on long
+	 * enough to move to another Known Network.
+	 */
+	bool broker_outage;
+	int64_t broker_failover_deadline_ms;
 };
 
 /*
