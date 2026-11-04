@@ -1,6 +1,6 @@
 import unittest
 
-from record import failed_rounds, next_round, past_rounds, render_comment
+from record import failed_rounds, next_round, past_rounds, render_comment, should_escalate
 
 SHA = "0123456789abcdef0123456789abcdef01234567"
 
@@ -23,6 +23,16 @@ class Rounds(unittest.TestCase):
     def test_passed_rounds_are_not_failures(self):
         rounds = past_rounds([render_comment(1, SHA, "failure", "x", 1), render_comment(2, SHA, "success", "ok", 1)])
         self.assertEqual(failed_rounds(rounds), 1)
+
+
+class Escalation(unittest.TestCase):
+    def test_third_failure_escalates(self):
+        self.assertFalse(should_escalate("failure", 2))
+        self.assertTrue(should_escalate("failure", 3))
+        self.assertTrue(should_escalate("failure", 4))
+
+    def test_a_pass_never_escalates(self):
+        self.assertFalse(should_escalate("success", 3))
 
 
 class Comment(unittest.TestCase):

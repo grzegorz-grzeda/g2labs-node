@@ -31,7 +31,7 @@ The PR body names the issue (`Closes #N`). Read `docs/issues/NNNN-*.md` as it is
 
 ## 3. Review
 
-Run the `code-review` skill (Standards and Spec axes) in the worktree with fixed point `origin/main` and the issue as the spec. If that skill isn't available, review both axes yourself:
+Run the `mattpocock-skills:code-review` skill (Standards and Spec axes) in the worktree, with fixed point `origin/main` and the issue as the spec. Don't use the built-in `code-review` skill: it hunts for correctness bugs, which isn't this review. If `mattpocock-skills:code-review` isn't available, or the diff is small enough that its parallel sub-agents aren't worth it, review both axes yourself:
 
 - **Standards**: `CLAUDE.md`, `docs/agents/*.md`, `docs/adr/`, `GLOSSARY.md` terms, `docs/mqtt.md` and `contract/` for any MQTT change.
 - **Spec**: every acceptance criterion of the issue, checked against the diff. Flag what's missing, what's wrong, and scope creep.
@@ -52,7 +52,7 @@ Don't comment on anything CI already checks (builds, tests, the contract checker
 
 Write the report to a file:
 
-- `## Standards` and `## Spec`, kept separate as the `code-review` skill reports them.
+- `## Standards` and `## Spec`, kept separate as that skill reports them.
 - A short `## Verdict` line.
 - For each finding: file and line, what's wrong and what would fix it. Mark each one **blocking** or **non-blocking**.
 
@@ -62,6 +62,6 @@ Write the report to a file:
 python3 .claude/skills/review-pr/record.py finish <PR> --sha <head-sha> --verdict success|failure --report <file>
 ```
 
-This posts the report as the round's PR comment and sets `claude-review` on the SHA. On the third failed round it also adds `ready-for-human`. If the PR moved on while you reviewed, it refuses and records nothing; start again from step 1 on the new head.
+This sets `claude-review` on the SHA, then posts the report as the round's PR comment. On the third failed round it also adds `ready-for-human`. If the PR moved on while you reviewed, it refuses and records nothing; start again from step 1 on the new head.
 
 Finish with one line for whoever started you: the PR, the round, the verdict and the number of blocking findings.
