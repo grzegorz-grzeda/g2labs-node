@@ -39,10 +39,19 @@ jobs:
           persist-credentials: false
           sparse-checkout: .github
 
-      - name: Drop human-approved after a push
-        if: github.event.action == 'synchronize'
+      # Approval covers only commits the maintainer has seen. The head has no
+      # human-gate status until a run on it finishes, so if it has none, the
+      # commits are new since any approval: drop it. Checking this in every
+      # run, not only on pushes, matters because a queued push run can be
+      # replaced by a later event's run. The one exception is the maintainer
+      # adding human-approved now, which approves the head as it is.
+      - name: Drop human-approved from unseen commits
+        if: ${{ !(github.event.action == 'labeled' && github.event.label.name == 'human-approved') }}
+        shell: bash
         run: |
-          if gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name' | grep -qx human-approved; then
+          has_label=$(gh api "repos/$REPO/issues/$PR/labels" --jq '[.[].name] | index("human-approved") != null')
+          seen=$(gh api "repos/$REPO/commits/$HEAD_SHA/statuses" --jq '[.[] | select(.context == "human-gate")] | length')
+          if [ "$has_label" = true ] && [ "$seen" = 0 ]; then
             gh api -X DELETE "repos/$REPO/issues/$PR/labels/human-approved" > /dev/null
             gh api "repos/$REPO/issues/$PR/comments" -f body="New commits since approval, so \`human-approved\` was removed. Add it again once you've looked at them." > /dev/null
           fi

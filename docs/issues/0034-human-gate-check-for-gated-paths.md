@@ -19,7 +19,7 @@ A CI job, `human-gate`, that keeps a PR from auto-merging while it changes somet
 
 ## Acceptance criteria
 
-- [x] Runs on `pull_request` (opened, synchronize, labeled, unlabeled)
+- [x] Runs on `pull_request` (opened, synchronize, labeled, unlabeled) (as `pull_request_target`, see the closing comment)
 - [x] Fails when the PR touches `.github/workflows/**`, `sysbuild*`, MCUboot key settings, `contract/**`, `docs/adr/**` or `VERSION`, or carries `ready-for-human`, unless it carries `human-approved`
 - [x] Passes otherwise, so it can be a required check on every PR
 - [x] A push after `human-approved` removes the label, so approval covers only what was looked at
@@ -29,7 +29,7 @@ A CI job, `human-gate`, that keeps a PR from auto-merging while it changes somet
 
 ### 2026-11-04 — claude
 
-Done. `.github/workflows/human-gate.yml` runs on `pull_request_target` (opened, synchronize, reopened, labeled, unlabeled), always from `main`'s copy, so a PR can't change its own gate. It reads the changed files (including the old names of renamed files) and the labels from the API, without checking out PR code. It posts the verdict as the `human-gate` commit status on the PR's head commit, which is what branch protection (#35) requires. On a push it removes `human-approved` and says so in a comment.
+Done. `.github/workflows/human-gate.yml` runs on `pull_request_target` (opened, synchronize, reopened, labeled, unlabeled), always from `main`'s copy, so a PR can't change its own gate. It reads the changed files (including the old names of renamed files) and the labels from the API, without checking out PR code. It posts the verdict as the `human-gate` commit status on the PR's head commit, which is what branch protection (#35) requires. Whenever the head commit has no `human-gate` status yet (new commits since any approval), a run removes `human-approved` and says so in a comment. The one exception is the run started by the maintainer adding the label.
 
 The gated paths are listed only in `.github/gated-paths`, which the flow doc links to. Besides the paths in this issue, the list also covers the gate's own files and the reviewer skill (`.claude/skills/review-pr/**`). The matching logic is in `.github/scripts/human_gate.py`, and its unit tests run in CI's `build-and-test` job.
 
