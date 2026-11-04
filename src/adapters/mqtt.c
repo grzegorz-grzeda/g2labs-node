@@ -128,7 +128,8 @@ static int resolve(const char *host, uint16_t port)
 	int err = zsock_getaddrinfo(host, service, &hints, &res);
 
 	if (err) {
-		LOG_WRN("can't resolve Broker \"%s\": %d", host, err);
+		LOG_WRN("can't resolve Broker \"%s\": %d (errno %d)", host, err,
+			err == DNS_EAI_SYSTEM ? errno : 0);
 		return -EHOSTUNREACH;
 	}
 	memcpy(&broker_addr, res->ai_addr, MIN(res->ai_addrlen, sizeof(broker_addr)));

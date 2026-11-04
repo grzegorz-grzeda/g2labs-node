@@ -6,6 +6,7 @@ What a Node publishes to the Broker. Topic names and JSON field names are a cont
 
 - MQTT 3.1.1 over plain TCP, clean session, keepalive 60 s, all publishes at QoS 0.
 - Client ID: the Node ID.
+- The host is a DNS name, a `.local` mDNS name or an IPv4 address.
 - Username and password from the `node broker` settings; with no username the Node connects anonymously.
 - Last will: `offline`, retained, on the availability topic.
 - After a failed connect or a lost connection the Node connects again after 10 s. It gives up on a connect that hasn't finished after 30 s. Without Wi-Fi it doesn't try at all.
