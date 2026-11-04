@@ -99,8 +99,10 @@ jobs:
           python -m unittest discover -s contract
           python contract/check.py --publisher node twister-out
 
-      - name: Development flow scripts' tests
-        run: python -m unittest discover -s .github/scripts
+      - name: Development flow scripts' tests (human-gate, review-pr)
+        run: |
+          python -m unittest discover -s .github/scripts
+          python -m unittest discover -s .claude/skills/review-pr
 
       - name: Build ESP32-C6 (sysbuild + MCUboot)
         run: west build --sysbuild -d build-c6 -b esp32c6_devkitc/esp32c6/hpcore .
