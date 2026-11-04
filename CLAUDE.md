@@ -85,6 +85,10 @@ Build and twister output (`build*/`, `twister-out*/`) is git-ignored.
 
 ## Agent skills
 
+### Development flow
+
+Every change goes through a branch (`<kind>/<issue>-<slug>`) and a squash-merged PR that auto-merges once CI, `claude-review` and `human-gate` pass. Merging never delivers: only a stable Release, approved by the maintainer through a release PR, reaches the fleet (ADR-0006). See `docs/agents/development-flow.md`.
+
 ### Issue tracker
 
 Issues are Markdown files in `docs/issues/`, one per issue, with status, labels, parent and blockers in front matter. `#N` means `docs/issues/NNNN-*.md`. See `docs/agents/issue-tracker.md`.

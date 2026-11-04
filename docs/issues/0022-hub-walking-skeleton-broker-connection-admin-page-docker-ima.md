@@ -22,6 +22,6 @@ The thinnest Hub that runs end to end: a TypeScript service in `service/` that c
 - [ ] The admin page requires the admin password and keeps a session cookie; it shows whether the Hub is connected to the Broker
 - [ ] Opens a SQLite database (WAL mode) in the data directory, with schema migrations
 - [ ] A Dockerfile builds an `arm64` and `amd64` image; `service/docker-compose.example.yml` runs it with `network_mode: host` next to Mosquitto
-- [ ] CI builds and tests the Hub on every push and publishes the image to GHCR on `v*` tags
+- [ ] CI builds and tests the Hub on every push and publishes the image to GHCR on Releases: tagged with the version for a Release Candidate, with the version and `latest` for a stable Release
 - [ ] `g2labs/hub/availability` is documented in `docs/mqtt.md` and has a schema in `contract/`
 - [ ] CLAUDE.md describes `service/` and its commands
