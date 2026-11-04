@@ -12,6 +12,16 @@ config NODE_BROKER_FAILOVER_S
 	  Shorter outages only reconnect on the same network; with a single
 	  Known Network the Node stays on it.
 
+config NODE_WATCHDOG_TIMEOUT_S
+	int "Seconds the main loop may stall before the watchdog resets"
+	default 30
+	range 5 600
+	help
+	  The main loop feeds the hardware watchdog at least once a second.
+	  If it stalls for this long (the SoC's watchdog may allow up to
+	  twice as long), the Node resets; an image that hasn't reached the
+	  Broker yet, and so isn't confirmed, is then reverted by MCUboot.
+
 endmenu
 
 source "Kconfig.zephyr"

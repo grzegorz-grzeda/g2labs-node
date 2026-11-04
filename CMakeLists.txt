@@ -14,5 +14,6 @@ target_sources(app PRIVATE
   src/adapters/settings.c
   src/adapters/smp.c
   src/adapters/system.c
+  src/adapters/watchdog.c
   src/adapters/wifi.c
 )

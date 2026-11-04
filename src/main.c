@@ -73,6 +73,9 @@ int main(void)
 	};
 	struct node_event event;
 
+	/* First, so a hang anywhere from here on resets the Node. */
+	watchdog_adapter_init(CONFIG_NODE_WATCHDOG_TIMEOUT_S * 1000U);
+
 	if (wifi_adapter_mac(info.mac) != 0) {
 		LOG_ERR("no Wi-Fi MAC address; the Node ID will be all zeros");
 	}
@@ -97,6 +100,8 @@ int main(void)
 			node_core_handle_event(&core, &event);
 		}
 		app_core_unlock();
+		/* The core got through another turn, so the Node isn't hung. */
+		watchdog_adapter_feed();
 	}
 	return 0;
 }

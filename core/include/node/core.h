@@ -287,6 +287,13 @@ struct node_core {
 	int64_t broker_failover_deadline_ms;
 
 	/*
+	 * The running image has been confirmed this boot. It is confirmed on the
+	 * first Broker connection, so an image that never gets there is
+	 * reverted by MCUboot on the next reboot.
+	 */
+	bool image_confirmed;
+
+	/*
 	 * A Reboot command arrived: the Node stays off the Broker and reboots
 	 * at reboot_at_ms (INT64_MAX once the reboot port has been called).
 	 */

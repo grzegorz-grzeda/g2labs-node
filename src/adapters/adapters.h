@@ -72,4 +72,11 @@ bool settings_adapter_is_password_key(const char *name);
  */
 void smp_adapter_init(void);
 
+/*
+ * Start the hardware watchdog: unless fed within about timeout_ms (the SoC
+ * may take up to twice that), it resets the Node.
+ */
+int watchdog_adapter_init(uint32_t timeout_ms);
+void watchdog_adapter_feed(void);
+
 #endif /* NODE_APP_ADAPTERS_H */

@@ -47,7 +47,9 @@ Build the image as usual. The file to upload is the signed one, `build-c6/g2labs
    smpmgr --ip 192.168.1.50 os reset
    ```
 
-The new image boots as a **test image**. Unless it gets confirmed, MCUboot reverts to the previous image on the next reboot. Confirming an image only after it has reached the Broker is #15. Until then, confirm a good test image yourself with `smpmgr --ip … image state-write --confirm`, which confirms the image that is running.
+The new image boots as a **test image**. It confirms itself on its first successful Broker connection; until then MCUboot reverts to the previous image on the next reboot. So an image that can't reach the Broker (it breaks Wi-Fi, MQTT, or a setting it reads) is undone by one more reset, from SMP if the Node is still reachable there (`smpmgr --ip … os reset`), else by power-cycling it. An image that hangs is reset by the hardware watchdog, which the main loop feeds: if the loop stalls for `CONFIG_NODE_WATCHDOG_TIMEOUT_S` (30 s by default; the SoC may allow up to twice that), the Node resets, and an image not yet confirmed reverts.
+
+To keep a test image that can't reach a Broker (on a bench without one, say), confirm it yourself with `smpmgr --ip … image state-write --confirm`, which confirms the image that is running.
 
 On the UART shell, `node image list` (`scripts/g2labs-node.py image list`) shows the same slots and states:
 
