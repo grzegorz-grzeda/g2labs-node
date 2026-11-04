@@ -42,6 +42,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Cache keys can't contain commas, so key on a hash of the filter.
+      - name: Compute west cache key
+        id: west-key
+        run: |
+          filter_hash=$(printf '%s' "$WEST_PROJECT_FILTER" | sha256sum | cut -c1-12)
+          echo "key=west-$ZEPHYR_REVISION-$filter_hash" >> "$GITHUB_OUTPUT"
+
       - name: Cache west workspace
         uses: actions/cache@v6
         with:
@@ -50,7 +57,7 @@ jobs:
             ws/zephyr
             ws/modules
             ws/bootloader
-          key: west-${{ env.ZEPHYR_REVISION }}-${{ env.WEST_PROJECT_FILTER }}
+          key: ${{ steps.west-key.outputs.key }}
 
       - name: Set up west workspace
         working-directory: ws
