@@ -177,6 +177,7 @@ def do_show(args):
             ("Known Networks", ("network", "list")),
             ("Network status", ("network", "status")),
             ("Broker", ("broker", "show")),
+            ("Images", ("image", "list")),
         ]
         for i, (title, node_args) in enumerate(sections):
             print(("\n" if i else "") + f"== {title} ==")
@@ -355,7 +356,7 @@ def parser():
     board_args(c)
     c.add_argument("--no-monitor", action="store_true", help="don't open the monitor after")
     cmd(sub, "monitor", do_monitor, "Open the Node's serial shell (quit with Ctrl-])")
-    cmd(sub, "show", do_show, "Show firmware version, Node ID, Known Networks and Broker")
+    cmd(sub, "show", do_show, "Show firmware version, Node ID, Known Networks, Broker and images")
 
     cmd(sub, "version", lambda a: run_and_print(a, "version"), "Print the firmware version")
     cmd(sub, "id", lambda a: run_and_print(a, "id"), "Print the Node ID and friendly name")
@@ -396,6 +397,10 @@ def parser():
     cmd(brk, "clear", lambda a: run_and_print(a, "broker", "clear"), "Forget the Broker")
     cmd(brk, "show", lambda a: run_and_print(a, "broker", "show"),
         "Show the Broker settings (password hidden) and connection")
+
+    img = group("image", "Firmware images")
+    cmd(img, "list", lambda a: run_and_print(a, "image", "list"),
+        "List the images in both slots and their state")
 
     c = cmd(sub, "provision", do_provision, "Apply a Provisioning file to the Node")
     c.epilog = PROVISION_HELP

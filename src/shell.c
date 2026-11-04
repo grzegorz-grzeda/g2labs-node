@@ -328,6 +328,37 @@ static int cmd_broker_show(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+static int cmd_image_list(const struct shell *sh, size_t argc, char **argv)
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	struct image_adapter_slot slots[IMAGE_ADAPTER_SLOTS];
+	size_t count = image_adapter_list(slots);
+
+	for (size_t i = 0; i < count; i++) {
+		const struct image_adapter_slot *s = &slots[i];
+		char hash[2 * IMAGE_ADAPTER_HASH_LEN + 1];
+
+		for (size_t j = 0; j < IMAGE_ADAPTER_HASH_LEN; j++) {
+			snprintf(&hash[2 * j], 3, "%02x", s->hash[j]);
+		}
+		shell_print(sh, "Slot %d: %s%s%s%s%s", s->slot, s->version,
+			    s->active ? " active" : "", s->confirmed ? " confirmed" : "",
+			    s->pending ? " pending" : "", s->permanent ? " permanent" : "");
+		shell_print(sh, "  hash %s", hash);
+	}
+	if (count == 0) {
+		shell_print(sh, "No images found");
+	}
+	return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(image_cmds,
+	SHELL_CMD_ARG(list, NULL, "List the images in both slots and their state", cmd_image_list,
+		      1, 0),
+	SHELL_SUBCMD_SET_END);
+
 SHELL_STATIC_SUBCMD_SET_CREATE(name_cmds,
 	SHELL_CMD_ARG(set, NULL, "Set the friendly name: set <name>", cmd_name_set, 2, 0),
 	SHELL_CMD_ARG(clear, NULL, "Clear the friendly name", cmd_name_clear, 1, 0),
@@ -362,6 +393,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(node_cmds,
 	SHELL_CMD(name, &name_cmds, "Friendly name", NULL),
 	SHELL_CMD(network, &network_cmds, "Known Networks", NULL),
 	SHELL_CMD(broker, &broker_cmds, "Broker connection", NULL),
+	SHELL_CMD(image, &image_cmds, "Firmware images", NULL),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(node, &node_cmds, "Node commands", NULL);

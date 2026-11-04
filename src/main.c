@@ -77,6 +77,7 @@ int main(void)
 		LOG_ERR("no Wi-Fi MAC address; the Node ID will be all zeros");
 	}
 	wifi_adapter_init();
+	smp_adapter_init();
 
 	app_core_lock();
 	node_core_init(&core, &ports, &info);
