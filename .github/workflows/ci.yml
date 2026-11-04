@@ -112,3 +112,69 @@ jobs:
           name: twister-report
           path: ws/apps/g2labs-node/twister-out/twister*.xml
           if-no-files-found: ignore
+
+  # The Hub (service/): build, test, and check the image on both platforms.
+  hub:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: service
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: service/.nvmrc
+          cache: npm
+          cache-dependency-path: service/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      # Each image must load better-sqlite3's native module for its platform.
+      - name: Build the image for amd64 and arm64
+        run: |
+          for arch in amd64 arm64; do
+            docker buildx build --platform "linux/$arch" --load -t "hub:$arch" .
+            docker run --rm --platform "linux/$arch" "hub:$arch" node -e \
+              "const D = require('better-sqlite3'); new D(':memory:'); console.log(process.arch, 'ok')"
+          done
+
+  # On a v* tag, publish the Hub's multi-arch image to GHCR.
+  hub-image:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-and-test, hub]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/g2labs-node-service
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: service
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

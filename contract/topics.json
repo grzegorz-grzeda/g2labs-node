@@ -20,6 +20,15 @@
       "schema": "schemas/status.schema.json",
       "examples": "examples/status",
       "meaning": "The Node's Status, right after online and then every 60 s."
+    },
+    {
+      "pattern": "g2labs/hub/availability",
+      "publisher": "hub",
+      "retained": true,
+      "encoding": "text",
+      "values": ["online", "offline"],
+      "examples": "examples/hub-availability",
+      "meaning": "Whether the Hub is connected to the Broker; offline is also its last will."
     }
   ]
 }

@@ -1,0 +1,38 @@
+# The Hub next to Mosquitto on a Raspberry Pi. Copy to docker-compose.yml,
+# set the passwords, then `docker compose up -d`.
+#
+# Both use the host network: the Hub reaches Nodes over mDNS and SMP-UDP,
+# which don't cross Docker's bridge network. The admin page is then on
+# http://<pi>:8080.
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      # mosquitto.conf with at least `listener 1883` and either
+      # `allow_anonymous true` or a password_file.
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+
+  hub:
+    image: ghcr.io/grzegorz-grzeda/g2labs-node-service:latest
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      HUB_MQTT_URL: mqtt://localhost:1883
+      HUB_MQTT_USERNAME: hub          # leave empty for an anonymous Broker
+      HUB_MQTT_PASSWORD: change-me
+      HUB_ADMIN_PASSWORD: change-me-too
+      HUB_HTTP_PORT: "8080"
+    volumes:
+      # The SQLite database. A named volume keeps it across image upgrades.
+      # With a bind mount instead, the directory must be writable by uid 1000.
+      - hub-data:/data
+
+volumes:
+  mosquitto-data:
+  hub-data:

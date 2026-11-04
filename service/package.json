@@ -1,0 +1,40 @@
+{
+  "name": "g2labs-node-service",
+  "version": "0.1.0",
+  "description": "The g2labs Hub: manages and observes g2labs Nodes through the MQTT Broker",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p web/tsconfig.json && vite build",
+    "start": "node dist/server/main.js",
+    "dev": "vite",
+    "test": "tsc -p test/tsconfig.json && vitest run"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/static": "^10.1.9",
+    "better-sqlite3": "^13.0.3",
+    "fastify": "^5.12.8",
+    "mqtt": "^5.16.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "aedes": "^1.2.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
+  },
+  "allowScripts": {
+    "better-sqlite3": false
+  }
+}

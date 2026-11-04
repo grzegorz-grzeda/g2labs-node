@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-g2labs-node is a Zephyr RTOS-based IoT node application (MIT licensed). The product specs are #1 (the Node firmware) and #17 (the Hub) in `docs/issues/`; domain terms are in `GLOSSARY.md`.
+g2labs-node is a Zephyr RTOS-based IoT node application (MIT licensed), plus the Hub that manages the Nodes (`service/`). The product specs are #1 (the Node firmware) and #17 (the Hub) in `docs/issues/`; domain terms are in `GLOSSARY.md`.
 
 ## Code layout
 
@@ -16,6 +16,7 @@ g2labs-node is a Zephyr RTOS-based IoT node application (MIT licensed). The prod
 - `contract/` — the MQTT contract between Nodes and the Hub: `topics.json` (every topic pattern with publisher, retained flag and encoding), strict JSON Schemas 2020-12 in `schemas/` (core keywords only, no additional properties) and example payloads in `examples/`. It only grows (ADR-0005): add topics and optional fields, never remove or retype. `contract/check.py` checks the contract (examples, docs coverage) and, given the twister output, every publish the core tests made (the fake ports dump them to `contract_publishes.jsonl`): `contract/check.py --publisher node twister-out`. Its own tests: `python -m unittest discover -s contract`.
 - `docs/mqtt.md` — the human explanation of the MQTT contract; update it together with `contract/` for any change to topics or payloads.
 - `tests/core/` — ztest suite driving the core through fake ports (`src/fake_ports.c`) on `native_sim`. Tests assert only on recorded outputs, never on core internals.
+- `service/` — the Hub (package `g2labs-node-service`), TypeScript on Node.js 24 (`service/.nvmrc`), separate from the Zephyr build. `src/hub.ts` wires `db.ts` (SQLite via `better-sqlite3`, WAL mode, append-only migrations in `PRAGMA user_version`), `broker.ts` (MQTT client: retained `g2labs/hub/availability` with an `offline` last will, reconnects) and `http.ts` (Fastify: the admin page from `dist/public` plus `/api`, behind one admin password and an in-memory session cookie); `src/main.ts` runs it from env vars (`src/config.ts`: `HUB_MQTT_URL`, `HUB_MQTT_USERNAME`, `HUB_MQTT_PASSWORD`, `HUB_ADMIN_PASSWORD`, `HUB_DATA_DIR`, `HUB_HTTP_PORT`, …). `web/` is the React + Vite admin page. `test/` drives the Hub only through MQTT (an in-process aedes Broker) and HTTP. `Dockerfile` builds the amd64/arm64 image; `docker-compose.example.yml` runs it with `network_mode: host` next to Mosquitto.
 - `VERSION` — firmware version (`APP_VERSION_*` in `<zephyr/app_version.h>`, also used to sign the MCUboot image).
 
 ## Workspace layout
@@ -79,9 +80,24 @@ west twister -T tests -p native_sim
 
 Build and twister output (`build*/`, `twister-out*/`) is git-ignored.
 
+## Hub commands
+
+Run from `service/` with Node.js 24 (`nvm use`). better-sqlite3 ships prebuilt binaries for linux/macOS/Windows x64 and arm64, so its compile-from-source install script is denied in `allowScripts` in `package.json`.
+
+```bash
+npm ci                     # install
+npm run build              # server into dist/server, admin page into dist/public
+npm test                   # typecheck, then vitest against an in-process Broker
+HUB_ADMIN_PASSWORD=x HUB_DATA_DIR=./data npm start   # run the built Hub (Broker on mqtt://localhost:1883)
+npm run dev                # admin page with hot reload, /api proxied to a Hub on :8080
+docker build -t g2labs-node-service .                # the container image
+```
+
 ## CI
 
 `.github/workflows/ci.yml` runs the core tests and both sysbuild builds on every push and pull request. It recreates a minimal workspace pinned to `ZEPHYR_REVISION` (with only the west modules in `WEST_PROJECT_FILTER`) and Zephyr SDK `ZEPHYR_SDK_VERSION`. When the local workspace's Zephyr or SDK is updated, bump those values in the same change.
+
+The `hub` job builds and tests `service/` and builds its image for amd64 and arm64 (under QEMU, loading better-sqlite3 in each). On a `v*` tag, `hub-image` pushes the multi-arch image to `ghcr.io/<owner>/g2labs-node-service` (`<version>`, `<major>.<minor>`, `latest`).
 
 ## Agent skills
 
