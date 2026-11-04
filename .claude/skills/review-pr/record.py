@@ -45,6 +45,11 @@ def failed_rounds(rounds):
     return sum(1 for _, _, v in rounds if v == "failure")
 
 
+def should_escalate(verdict, failures):
+    """True when this round's failure is the one that hands the PR to a human."""
+    return verdict == "failure" and failures >= MAX_FAILED_ROUNDS
+
+
 def render_comment(round_no, sha, verdict, report, failures):
     icon = "✅ passed" if verdict == "success" else "❌ changes needed"
     lines = [
@@ -55,7 +60,7 @@ def render_comment(round_no, sha, verdict, report, failures):
         "",
         report.strip(),
     ]
-    if verdict == "failure" and failures >= MAX_FAILED_ROUNDS:
+    if should_escalate(verdict, failures):
         lines += [
             "",
             f"This is failed round {failures}, so the PR is labelled `{NEEDS_HUMAN}` "
@@ -122,9 +127,11 @@ def cmd_finish(args):
     round_no = next_round(rounds)
     failures = failed_rounds(rounds) + (args.verdict == "failure")
     body = render_comment(round_no, args.sha, args.verdict, args.report.read_text(), failures)
-    gh("pr", "comment", str(args.pr), "--body-file", "-", input=body)
+    # Status first: the comment is what counts a round, so if the status write
+    # fails, nothing has been counted and a rerun uses the same round number.
     set_status(r, args.sha, args.verdict, status_description(round_no, args.verdict), args.pr)
-    escalate = args.verdict == "failure" and failures >= MAX_FAILED_ROUNDS
+    gh("pr", "comment", str(args.pr), "--body-file", "-", input=body)
+    escalate = should_escalate(args.verdict, failures)
     if escalate:
         # REST, not `gh pr edit`: that trips over the Projects (classic) sunset.
         gh("api", "-X", "POST", f"repos/{r}/issues/{args.pr}/labels", "-f", f"labels[]={NEEDS_HUMAN}")

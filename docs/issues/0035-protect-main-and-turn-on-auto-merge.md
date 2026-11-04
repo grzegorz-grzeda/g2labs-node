@@ -38,6 +38,6 @@ Done, with the maintainer's go-ahead given in the session.
   - `claude-review`, accepted from any source, because the reviewer sets it with the maintainer's `gh` login.
 - **Pushes**: force-push and deletion are off. Admins aren't included (`enforce_admins: false`), so the admin bypass stays for emergencies.
 - **Labels**: `ready-for-human` already existed; `human-approved` was added.
-- **Live test**: this PR, opened with auto-merge on, waited for each check and merged itself once all of them passed.
+- **Live test**: PR #32, which closed this issue, was opened with auto-merge on. It waited for each check, through a GitHub Actions outage, and merged itself once all of them passed.
 
 Live runs while landing #33 and #34 showed the gate working. A push to PR #31 after approval removed `human-approved` and set `human-gate` to failure; adding the label again turned it to success.
