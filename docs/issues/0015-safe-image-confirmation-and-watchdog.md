@@ -5,6 +5,7 @@ status: open
 labels: [ready-for-agent]
 parent: 1
 blocked_by: [6, 14]
+assignee: claude
 created: 2026-11-04
 ---
 
