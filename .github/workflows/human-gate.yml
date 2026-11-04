@@ -48,11 +48,19 @@ jobs:
           fi
 
       - name: Decide and set the human-gate status
+        shell: bash  # -e and pipefail
         run: |
+          # Fetch first, so a failing API call fails the job (and leaves no
+          # status) instead of feeding the gate an empty file list.
           labels=$(gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name' | paste -sd, -)
+          files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" \
+                    --jq '.[] | .filename, (.previous_filename // empty)')
+          if [ -z "$files" ]; then
+            echo "no changed files reported for PR #$PR" >&2
+            exit 1
+          fi
           set +e
-          reason=$(gh api --paginate "repos/$REPO/pulls/$PR/files" \
-                     --jq '.[] | .filename, (.previous_filename // empty)' \
+          reason=$(printf '%s\n' "$files" \
                    | python3 .github/scripts/human_gate.py --patterns .github/gated-paths --labels "$labels")
           verdict=$?
           set -e
