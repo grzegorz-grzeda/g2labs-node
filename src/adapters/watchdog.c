@@ -13,9 +13,10 @@
 LOG_MODULE_REGISTER(watchdog_adapter, LOG_LEVEL_INF);
 
 static const struct device *const wdt = DEVICE_DT_GET(DT_ALIAS(watchdog0));
-static int channel = -1;
+/* The installed timeout, or negative while the watchdog isn't running. */
+static int wdt_channel = -1;
 
-int watchdog_adapter_init(uint32_t timeout_ms)
+void watchdog_adapter_init(uint32_t timeout_ms)
 {
 	const struct wdt_timeout_cfg cfg = {
 		.window = {.min = 0, .max = timeout_ms},
@@ -25,26 +26,23 @@ int watchdog_adapter_init(uint32_t timeout_ms)
 
 	if (!device_is_ready(wdt)) {
 		LOG_ERR("watchdog not ready; a hung Node won't reset itself");
-		return -ENODEV;
+		return;
 	}
-	channel = wdt_install_timeout(wdt, &cfg);
-	if (channel < 0) {
-		LOG_ERR("watchdog timeout not installed: %d", channel);
-		return channel;
+	wdt_channel = wdt_install_timeout(wdt, &cfg);
+	if (wdt_channel < 0) {
+		LOG_ERR("watchdog timeout not installed: %d", wdt_channel);
+		return;
 	}
-	/* Pause while a debugger halts the CPU, where the driver supports it. */
-	err = wdt_setup(wdt, WDT_OPT_PAUSE_HALTED_BY_DBG);
+	err = wdt_setup(wdt, 0);
 	if (err) {
 		LOG_ERR("watchdog not started: %d", err);
-		channel = -1;
-		return err;
+		wdt_channel = -1;
 	}
-	return 0;
 }
 
 void watchdog_adapter_feed(void)
 {
-	if (channel >= 0) {
-		wdt_feed(wdt, channel);
+	if (wdt_channel >= 0) {
+		wdt_feed(wdt, wdt_channel);
 	}
 }
