@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include <node/core.h>
 
+#include "json.h"
+
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -90,82 +92,6 @@ static void broker_disconnect(struct node_core *core, bool retry)
 	core->broker_timeout_ms = core->now_ms + NODE_BROKER_RETRY_INTERVAL_MS;
 }
 
-/* Appends to a fixed buffer; output past the end is dropped and flagged. */
-struct json_writer {
-	char *buf;
-	size_t size;
-	size_t len;
-	bool overflow;
-	/* A member has been written, so the next needs a comma. */
-	bool has_member;
-};
-
-static void json_putc(struct json_writer *w, char c)
-{
-	if (w->len + 1 < w->size) {
-		w->buf[w->len++] = c;
-		w->buf[w->len] = '\0';
-	} else {
-		w->overflow = true;
-	}
-}
-
-static void json_raw(struct json_writer *w, const char *s)
-{
-	while (*s != '\0') {
-		json_putc(w, *s++);
-	}
-}
-
-/* A JSON string: quotes, backslashes and control characters escaped. */
-static void json_string(struct json_writer *w, const char *s)
-{
-	static const char hex[] = "0123456789abcdef";
-
-	json_putc(w, '"');
-	for (; *s != '\0'; s++) {
-		unsigned char c = (unsigned char)*s;
-
-		if (c == '"' || c == '\\') {
-			json_putc(w, '\\');
-			json_putc(w, (char)c);
-		} else if (c < 0x20) {
-			json_raw(w, "\\u00");
-			json_putc(w, hex[c >> 4]);
-			json_putc(w, hex[c & 0x0f]);
-		} else {
-			json_putc(w, (char)c);
-		}
-	}
-	json_putc(w, '"');
-}
-
-static void json_key(struct json_writer *w, const char *key)
-{
-	if (w->has_member) {
-		json_putc(w, ',');
-	}
-	w->has_member = true;
-	json_string(w, key);
-	json_putc(w, ':');
-}
-
-static void json_unsigned(struct json_writer *w, unsigned long v)
-{
-	char num[24];
-
-	snprintf(num, sizeof(num), "%lu", v);
-	json_raw(w, num);
-}
-
-static void json_int(struct json_writer *w, int v)
-{
-	char num[24];
-
-	snprintf(num, sizeof(num), "%d", v);
-	json_raw(w, num);
-}
-
 /* Room for the status JSON with every string at its longest, fully escaped. */
 #define STATUS_MAX 512
 
@@ -204,6 +130,103 @@ static void publish_status(struct node_core *core)
 	core->broker_timeout_ms = core->now_ms + NODE_STATUS_INTERVAL_MS;
 }
 
+/*
+ * The command name from a command payload, {"command": "<name>"} plus any
+ * members the Node doesn't know. `name` holds NODE_COMMAND_MAX_LEN + 1.
+ */
+static bool parse_command(const char *payload, size_t len, char *name)
+{
+	struct json_reader r = {.p = payload, .end = payload + len};
+	char key[NODE_COMMAND_MAX_LEN + 1];
+	bool found = false;
+
+	if (!json_expect(&r, '{')) {
+		return false;
+	}
+	if (!json_expect(&r, '}')) {
+		do {
+			if (!json_read_string(&r, key) || !json_expect(&r, ':')) {
+				return false;
+			}
+			if (strcmp(key, "command") == 0) {
+				json_skip_space(&r);
+				if (found || !json_read_string(&r, name)) {
+					return false;
+				}
+				found = true;
+			} else if (!json_skip_value(&r, 1)) {
+				return false;
+			}
+		} while (json_expect(&r, ','));
+		if (!json_expect(&r, '}')) {
+			return false;
+		}
+	}
+	json_skip_space(&r);
+	return found && r.p == r.end;
+}
+
+/* Room for a warning naming an unknown command; a long name is cut short. */
+#define WARNING_MAX 160
+
+static void warn(struct node_core *core, const char *message)
+{
+	core->ports->log_warning(core->ports->ctx, message);
+}
+
+static void warn_unknown_command(struct node_core *core, const char *name)
+{
+	char message[WARNING_MAX];
+	struct json_writer w = {.buf = message, .size = sizeof(message)};
+
+	json_raw(&w, "ignored unknown command ");
+	json_string(&w, name);
+	warn(core, message);
+}
+
+static void on_command(struct node_core *core, const struct node_event *event)
+{
+	char name[NODE_COMMAND_MAX_LEN + 1];
+
+	if (core->broker_state != NODE_BROKER_CONNECTED) {
+		/* Queued before the connection went: not meant for now. */
+		warn(core, "ignored a command from a closed Broker connection");
+		return;
+	}
+	if (event->command.retained) {
+		/* A retained Reboot would reboot the Node on every connect. */
+		warn(core, "ignored a retained command");
+		return;
+	}
+	/* len over the maximum would be an adapter bug; don't read past payload. */
+	if (event->command.truncated || event->command.len > NODE_COMMAND_MAX_LEN ||
+	    !parse_command(event->command.payload, event->command.len, name)) {
+		warn(core, "ignored a malformed command");
+		return;
+	}
+	if (strcmp(name, "publish_status") == 0) {
+		publish_status(core);
+	} else if (strcmp(name, "reboot") == 0) {
+		/* Say offline and leave cleanly; the reboot waits for it to get out. */
+		core->reboot_pending = true;
+		core->reboot_at_ms = core->now_ms + NODE_REBOOT_DELAY_MS;
+		broker_disconnect(core, false);
+	} else {
+		warn_unknown_command(core, name);
+	}
+}
+
+static void subscribe_commands(struct node_core *core)
+{
+	char topic[TOPIC_MAX];
+
+	node_topic(core, topic, "command");
+	if (core->ports->mqtt_subscribe_commands(core->ports->ctx, topic) != 0) {
+		/* The next connection tries again. */
+		warn(core, "can't subscribe to commands on this Broker connection");
+	}
+}
+
 static void on_broker_connected(struct node_core *core)
 {
 	if (core->broker_state == NODE_BROKER_IDLE) {
@@ -212,6 +235,7 @@ static void on_broker_connected(struct node_core *core)
 	core->broker_state = NODE_BROKER_CONNECTED;
 	core->broker_outage = false;
 	publish(core, "availability", "online", true);
+	subscribe_commands(core);
 	publish_status(core);
 }
 
@@ -230,8 +254,8 @@ static void on_broker_disconnected(struct node_core *core)
 /* Connect to the Broker when there is one and Wi-Fi is up. */
 static void broker_update(struct node_core *core)
 {
-	bool wanted = core->started && core->wifi_state == NODE_WIFI_CONNECTED &&
-		      core->broker.host[0] != '\0';
+	bool wanted = core->started && !core->reboot_pending &&
+		      core->wifi_state == NODE_WIFI_CONNECTED && core->broker.host[0] != '\0';
 
 	if (wanted && core->broker_state == NODE_BROKER_IDLE) {
 		if (!core->broker_outage) {
@@ -455,6 +479,9 @@ void node_core_handle_event(struct node_core *core, const struct node_event *eve
 	case NODE_EVENT_BROKER_DISCONNECTED:
 		on_broker_disconnected(core);
 		break;
+	case NODE_EVENT_COMMAND:
+		on_command(core, event);
+		break;
 	}
 	broker_update(core);
 }
@@ -529,9 +556,18 @@ static void broker_failover_tick(struct node_core *core, int64_t now_ms)
 	broker_update(core);
 }
 
+static void reboot_tick(struct node_core *core, int64_t now_ms)
+{
+	if (core->reboot_pending && now_ms >= core->reboot_at_ms) {
+		core->reboot_at_ms = INT64_MAX;
+		core->ports->reboot(core->ports->ctx);
+	}
+}
+
 void node_core_tick(struct node_core *core, int64_t now_ms)
 {
 	core->now_ms = now_ms;
+	reboot_tick(core, now_ms);
 	wifi_tick(core, now_ms);
 	broker_failover_tick(core, now_ms);
 	broker_tick(core, now_ms);

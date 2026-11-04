@@ -61,6 +61,12 @@ struct node_ports {
 	int (*mqtt_publish)(void *ctx, const char *topic, const void *payload, size_t len,
 			    bool retained);
 
+	/*
+	 * MQTT adapter: subscribe to the Node's command topic (QoS 0) on the
+	 * current connection. Messages on it arrive as NODE_EVENT_COMMAND.
+	 */
+	int (*mqtt_subscribe_commands)(void *ctx, const char *topic);
+
 	/* Wi-Fi adapter: the RSSI of the current link, in dBm. */
 	int (*wifi_rssi)(void *ctx, int *rssi);
 
@@ -78,6 +84,12 @@ struct node_ports {
 
 	/* Image adapter: mark the running image as confirmed. */
 	int (*image_confirm)(void *ctx);
+
+	/* Restart the Node. On hardware it doesn't return. */
+	void (*reboot)(void *ctx);
+
+	/* Tell the maintainer about something the core ignored, e.g. in the log. */
+	void (*log_warning)(void *ctx, const char *message);
 };
 
 /*
@@ -115,6 +127,11 @@ struct node_ports {
 #define NODE_BROKER_PASSWORD_MAX_LEN 64
 #define NODE_BROKER_DEFAULT_PORT     1883
 #define NODE_FRIENDLY_NAME_MAX_LEN   32
+
+/* The longest command payload the core reads; longer ones are malformed. */
+#define NODE_COMMAND_MAX_LEN 128
+/* How long the Node waits after a Reboot command, so "offline" gets out. */
+#define NODE_REBOOT_DELAY_MS 1000
 
 /* A Node ID: the Wi-Fi MAC address as 12 lowercase hex digits. */
 #define NODE_ID_LEN  12
@@ -162,6 +179,8 @@ enum node_event_type {
 	NODE_EVENT_BROKER_CONNECTED,
 	/* The Broker connection failed or was lost. */
 	NODE_EVENT_BROKER_DISCONNECTED,
+	/* A message arrived on the Node's command topic. */
+	NODE_EVENT_COMMAND,
 };
 
 struct node_event {
@@ -171,6 +190,15 @@ struct node_event {
 			char ssid[NODE_SSID_MAX_LEN + 1];
 			int rssi;
 		} network_heard;
+		struct {
+			/* The first `len` bytes of the payload; not NUL-terminated. */
+			char payload[NODE_COMMAND_MAX_LEN];
+			size_t len;
+			/* The payload was longer than NODE_COMMAND_MAX_LEN. */
+			bool truncated;
+			/* The Broker delivered it as a retained message. */
+			bool retained;
+		} command;
 	};
 };
 
@@ -257,6 +285,13 @@ struct node_core {
 	 */
 	bool broker_outage;
 	int64_t broker_failover_deadline_ms;
+
+	/*
+	 * A Reboot command arrived: the Node stays off the Broker and reboots
+	 * at reboot_at_ms (INT64_MAX once the reboot port has been called).
+	 */
+	bool reboot_pending;
+	int64_t reboot_at_ms;
 };
 
 /*

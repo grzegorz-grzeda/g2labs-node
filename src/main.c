@@ -19,12 +19,15 @@ static const struct node_ports ports = {
 	.mqtt_connect = mqtt_adapter_connect,
 	.mqtt_disconnect = mqtt_adapter_disconnect,
 	.mqtt_publish = mqtt_adapter_publish,
+	.mqtt_subscribe_commands = mqtt_adapter_subscribe_commands,
 	.wifi_rssi = wifi_adapter_rssi,
 	.free_memory = memory_adapter_free,
 	.wifi_scan = wifi_adapter_scan,
 	.wifi_connect = wifi_adapter_connect,
 	.wifi_disconnect = wifi_adapter_disconnect,
 	.image_confirm = image_adapter_confirm,
+	.reboot = system_adapter_reboot,
+	.log_warning = system_adapter_log_warning,
 };
 
 static struct node_core core;
@@ -45,14 +48,20 @@ void app_core_unlock(void)
 void app_post_event(const struct node_event *event)
 {
 	/*
-	 * Scan results may be dropped when a scan floods the queue; every other
-	 * event changes the core's state, so wait for room.
+	 * Scan results may be dropped when a scan floods the queue. Commands are
+	 * dropped too: the MQTT adapter posts them holding its client lock, which
+	 * the core may be waiting for. Every other event changes the core's
+	 * state, so wait for room.
 	 */
-	k_timeout_t wait =
-		event->type == NODE_EVENT_WIFI_NETWORK_HEARD ? K_NO_WAIT : K_FOREVER;
+	bool droppable = event->type == NODE_EVENT_WIFI_NETWORK_HEARD ||
+			 event->type == NODE_EVENT_COMMAND;
 
-	if (k_msgq_put(&event_queue, event, wait) != 0) {
-		LOG_DBG("event queue full, dropped scan result");
+	if (k_msgq_put(&event_queue, event, droppable ? K_NO_WAIT : K_FOREVER) != 0) {
+		if (event->type == NODE_EVENT_COMMAND) {
+			LOG_WRN("event queue full, dropped a command");
+		} else {
+			LOG_DBG("event queue full, dropped scan result");
+		}
 	}
 }
 
