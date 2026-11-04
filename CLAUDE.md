@@ -10,7 +10,7 @@ g2labs-node is a Zephyr RTOS-based IoT node application (MIT licensed). The prod
 
 - `core/` — the Node core: all decision-making, plain C. It must not include Zephyr Wi-Fi, Bluetooth, MQTT or MCUboot headers. Inputs are calls into `core/include/node/core.h`; outputs go only through the ports in `struct node_ports` (MQTT publish, Wi-Fi requests, image confirm). `core/core.cmake` adds it to a Zephyr `app` target.
 - `src/adapters/` — the only code that touches Zephyr radio, network, MCUboot and settings APIs. Port functions implement `struct node_ports`; the rest are setup (`wifi_adapter_init`), persistence (`settings_adapter_*`, which load into and save from the core's public API) and diagnostics (`wifi_adapter_link_info`) used by `src/`.
-- `src/main.c` wires adapters into the core and runs it: adapters post events with `app_post_event()` (any thread) and the main loop feeds them to the core. The core isn't thread-safe, so anything else touching it (the shell) holds `app_core_lock()`.
+- `src/main.c` wires adapters into the core and runs it: adapters post events with `app_post_event()` (any thread) and the main loop feeds them to the core, telling it the time (`node_core_tick()`) at least once a second for its Wi-Fi timeouts. The core isn't thread-safe, so anything else touching it (the shell) holds `app_core_lock()`.
 - `src/shell.c` holds the `node …` UART shell commands (`node version`, `node network add|remove|list|status`).
 - `tests/core/` — ztest suite driving the core through fake ports (`src/fake_ports.c`) on `native_sim`. Tests assert only on recorded outputs, never on core internals.
 - `VERSION` — firmware version (`APP_VERSION_*` in `<zephyr/app_version.h>`, also used to sign the MCUboot image).

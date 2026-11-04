@@ -29,6 +29,7 @@ struct fake_ports {
 	size_t publish_count;
 	size_t wifi_scan_count;
 	size_t wifi_connect_count;
+	size_t wifi_disconnect_count;
 	char last_connect_ssid[NODE_SSID_MAX_LEN + 1];
 	char last_connect_password[NODE_PASSWORD_MAX_LEN + 1];
 	size_t image_confirm_count;

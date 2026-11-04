@@ -11,12 +11,15 @@
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
 #define EVENT_QUEUE_LEN 64
+/* The core is told the time at least this often, for its Wi-Fi timeouts. */
+#define TICK_PERIOD     K_SECONDS(1)
 
 static const struct node_ports ports = {
 	.ctx = NULL,
 	.mqtt_publish = mqtt_adapter_publish,
 	.wifi_scan = wifi_adapter_scan,
 	.wifi_connect = wifi_adapter_connect,
+	.wifi_disconnect = wifi_adapter_disconnect,
 	.image_confirm = image_adapter_confirm,
 };
 
@@ -59,15 +62,20 @@ int main(void)
 	app_core_lock();
 	node_core_init(&core, &ports, &info);
 	settings_adapter_load_known_networks(&core);
+	node_core_tick(&core, k_uptime_get());
 	node_core_start(&core);
 	app_core_unlock();
 
 	LOG_INF("g2labs-node %s started", info.fw_version);
 
 	while (true) {
-		k_msgq_get(&event_queue, &event, K_FOREVER);
+		bool have_event = k_msgq_get(&event_queue, &event, TICK_PERIOD) == 0;
+
 		app_core_lock();
-		node_core_handle_event(&core, &event);
+		node_core_tick(&core, k_uptime_get());
+		if (have_event) {
+			node_core_handle_event(&core, &event);
+		}
 		app_core_unlock();
 	}
 	return 0;

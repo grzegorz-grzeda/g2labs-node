@@ -20,6 +20,7 @@ int mqtt_adapter_publish(void *ctx, const char *topic, const void *payload, size
 void wifi_adapter_init(void);
 int wifi_adapter_scan(void *ctx);
 int wifi_adapter_connect(void *ctx, const char *ssid, const char *password);
+int wifi_adapter_disconnect(void *ctx);
 /* RSSI and IPv4 address of the current link, for diagnostics. */
 int wifi_adapter_link_info(int *rssi, char *ip, size_t ip_len);
 

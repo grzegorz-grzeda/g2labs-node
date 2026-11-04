@@ -10,6 +10,7 @@
 
 #include <zephyr/logging/log.h>
 #include <zephyr/net/net_if.h>
+#include <zephyr/net/dhcpv4.h>
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/wifi_mgmt.h>
@@ -104,8 +105,6 @@ static void on_network_heard(const struct wifi_scan_result *result)
 static void wifi_event_handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
 			       struct net_if *iface)
 {
-	ARG_UNUSED(iface);
-
 	switch (mgmt_event) {
 	case NET_EVENT_WIFI_SCAN_RESULT:
 		on_network_heard(cb->info);
@@ -116,14 +115,21 @@ static void wifi_event_handler(struct net_mgmt_event_callback *cb, uint64_t mgmt
 	case NET_EVENT_WIFI_CONNECT_RESULT: {
 		const struct wifi_status *status = cb->info;
 
-		/* Success is reported as CONNECTED once DHCP gives an address. */
-		if (status->status != 0) {
+		/*
+		 * Associated (CONFIG_WIFI_STA_AUTO_DHCPV4 is off): ask for an
+		 * address; CONNECTED follows once DHCP gives one.
+		 */
+		if (status->status == 0) {
+			post_event(NODE_EVENT_WIFI_ASSOCIATED);
+			net_dhcpv4_start(iface);
+		} else {
 			LOG_WRN("join failed: %d", status->status);
 			post_event(NODE_EVENT_WIFI_DISCONNECTED);
 		}
 		break;
 	}
 	case NET_EVENT_WIFI_DISCONNECT_RESULT:
+		net_dhcpv4_stop(iface);
 		post_event(NODE_EVENT_WIFI_DISCONNECTED);
 		break;
 	default:
@@ -202,6 +208,27 @@ int wifi_adapter_connect(void *ctx, const char *ssid, const char *password)
 		LOG_ERR("join request failed: %d", err);
 	}
 	return err;
+}
+
+int wifi_adapter_disconnect(void *ctx)
+{
+	ARG_UNUSED(ctx);
+
+	struct net_if *iface = net_if_get_first_wifi();
+
+	if (iface == NULL) {
+		return -ENODEV;
+	}
+
+	LOG_INF("leaving the current network");
+	int err = net_mgmt(NET_REQUEST_WIFI_DISCONNECT, iface, NULL, 0);
+
+	/* -EALREADY: not on a network, which is what was asked for. */
+	if (err && err != -EALREADY) {
+		LOG_WRN("disconnect request failed: %d", err);
+		return err;
+	}
+	return 0;
 }
 
 int wifi_adapter_link_info(int *rssi, char *ip, size_t ip_len)

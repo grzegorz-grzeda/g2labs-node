@@ -43,6 +43,14 @@ static int fake_wifi_connect(void *ctx, const char *ssid, const char *password)
 	return fake->wifi_connect_result;
 }
 
+static int fake_wifi_disconnect(void *ctx)
+{
+	struct fake_ports *fake = ctx;
+
+	fake->wifi_disconnect_count++;
+	return 0;
+}
+
 static int fake_image_confirm(void *ctx)
 {
 	struct fake_ports *fake = ctx;
@@ -59,6 +67,7 @@ void fake_ports_init(struct fake_ports *fake)
 		.mqtt_publish = fake_mqtt_publish,
 		.wifi_scan = fake_wifi_scan,
 		.wifi_connect = fake_wifi_connect,
+		.wifi_disconnect = fake_wifi_disconnect,
 		.image_confirm = fake_image_confirm,
 	};
 }
