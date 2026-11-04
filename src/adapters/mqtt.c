@@ -401,7 +401,7 @@ int mqtt_adapter_publish(void *ctx, const char *topic, const void *payload, size
 	return err;
 }
 
-int mqtt_adapter_subscribe(void *ctx, const char *topic)
+int mqtt_adapter_subscribe_commands(void *ctx, const char *topic)
 {
 	ARG_UNUSED(ctx);
 	static uint16_t message_id;

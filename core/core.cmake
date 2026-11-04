@@ -7,4 +7,5 @@ set(NODE_CORE_DIR ${CMAKE_CURRENT_LIST_DIR})
 target_include_directories(app PRIVATE ${NODE_CORE_DIR}/include)
 target_sources(app PRIVATE
   ${NODE_CORE_DIR}/src/core.c
+  ${NODE_CORE_DIR}/src/json.c
 )

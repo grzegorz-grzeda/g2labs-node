@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -242,8 +243,16 @@ ZTEST(commands, test_a_command_left_over_from_a_lost_connection_is_dropped)
 	fake.publish_count = 0;
 
 	command("{\"command\":\"reboot\"}");
-	advance(NODE_REBOOT_DELAY_MS);
 
-	zassert_equal(fake.reboot_count, 0);
-	zassert_equal(fake.publish_count, 0);
+	assert_ignored("left over");
+}
+
+ZTEST(commands, test_a_failed_subscription_is_logged)
+{
+	fake.mqtt_subscribe_result = -ENOMEM;
+
+	connect_to_broker();
+
+	zassert_equal(fake.warning_count, 1);
+	zassert_not_null(strstr(fake.last_warning, "command"), "%s", fake.last_warning);
 }

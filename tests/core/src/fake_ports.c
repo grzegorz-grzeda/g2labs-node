@@ -139,7 +139,7 @@ static int fake_mqtt_subscribe(void *ctx, const char *topic)
 
 	fake->mqtt_subscribe_count++;
 	copy(fake->last_subscribe_topic, sizeof(fake->last_subscribe_topic), topic);
-	return 0;
+	return fake->mqtt_subscribe_result;
 }
 
 static void fake_reboot(void *ctx)
@@ -214,7 +214,7 @@ void fake_ports_init(struct fake_ports *fake)
 		.mqtt_connect = fake_mqtt_connect,
 		.mqtt_disconnect = fake_mqtt_disconnect,
 		.mqtt_publish = fake_mqtt_publish,
-		.mqtt_subscribe = fake_mqtt_subscribe,
+		.mqtt_subscribe_commands = fake_mqtt_subscribe,
 		.wifi_rssi = fake_wifi_rssi,
 		.free_memory = fake_free_memory,
 		.wifi_scan = fake_wifi_scan,

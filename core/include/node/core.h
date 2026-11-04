@@ -65,7 +65,7 @@ struct node_ports {
 	 * MQTT adapter: subscribe to the Node's command topic (QoS 0) on the
 	 * current connection. Messages on it arrive as NODE_EVENT_COMMAND.
 	 */
-	int (*mqtt_subscribe)(void *ctx, const char *topic);
+	int (*mqtt_subscribe_commands)(void *ctx, const char *topic);
 
 	/* Wi-Fi adapter: the RSSI of the current link, in dBm. */
 	int (*wifi_rssi)(void *ctx, int *rssi);

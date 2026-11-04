@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include <node/core.h>
 
+#include "json.h"
+
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -90,82 +92,6 @@ static void broker_disconnect(struct node_core *core, bool retry)
 	core->broker_timeout_ms = core->now_ms + NODE_BROKER_RETRY_INTERVAL_MS;
 }
 
-/* Appends to a fixed buffer; output past the end is dropped and flagged. */
-struct json_writer {
-	char *buf;
-	size_t size;
-	size_t len;
-	bool overflow;
-	/* A member has been written, so the next needs a comma. */
-	bool has_member;
-};
-
-static void json_putc(struct json_writer *w, char c)
-{
-	if (w->len + 1 < w->size) {
-		w->buf[w->len++] = c;
-		w->buf[w->len] = '\0';
-	} else {
-		w->overflow = true;
-	}
-}
-
-static void json_raw(struct json_writer *w, const char *s)
-{
-	while (*s != '\0') {
-		json_putc(w, *s++);
-	}
-}
-
-/* A JSON string: quotes, backslashes and control characters escaped. */
-static void json_string(struct json_writer *w, const char *s)
-{
-	static const char hex[] = "0123456789abcdef";
-
-	json_putc(w, '"');
-	for (; *s != '\0'; s++) {
-		unsigned char c = (unsigned char)*s;
-
-		if (c == '"' || c == '\\') {
-			json_putc(w, '\\');
-			json_putc(w, (char)c);
-		} else if (c < 0x20) {
-			json_raw(w, "\\u00");
-			json_putc(w, hex[c >> 4]);
-			json_putc(w, hex[c & 0x0f]);
-		} else {
-			json_putc(w, (char)c);
-		}
-	}
-	json_putc(w, '"');
-}
-
-static void json_key(struct json_writer *w, const char *key)
-{
-	if (w->has_member) {
-		json_putc(w, ',');
-	}
-	w->has_member = true;
-	json_string(w, key);
-	json_putc(w, ':');
-}
-
-static void json_unsigned(struct json_writer *w, unsigned long v)
-{
-	char num[24];
-
-	snprintf(num, sizeof(num), "%lu", v);
-	json_raw(w, num);
-}
-
-static void json_int(struct json_writer *w, int v)
-{
-	char num[24];
-
-	snprintf(num, sizeof(num), "%d", v);
-	json_raw(w, num);
-}
-
 /* Room for the status JSON with every string at its longest, fully escaped. */
 #define STATUS_MAX 512
 
@@ -202,176 +128,6 @@ static void publish_status(struct node_core *core)
 		publish(core, "status", payload, false);
 	}
 	core->broker_timeout_ms = core->now_ms + NODE_STATUS_INTERVAL_MS;
-}
-
-/*
- * Reads a command payload, a JSON object, from a buffer that isn't
- * NUL-terminated. Each function returns false on malformed input.
- */
-struct json_reader {
-	const char *p;
-	const char *end;
-};
-
-/* Nesting allowed inside a command payload, in members the Node ignores. */
-#define JSON_MAX_DEPTH 8
-
-static void json_skip_space(struct json_reader *r)
-{
-	while (r->p < r->end && (*r->p == ' ' || *r->p == '\t' || *r->p == '\n' || *r->p == '\r')) {
-		r->p++;
-	}
-}
-
-/* Consume `c`, after any whitespace. */
-static bool json_expect(struct json_reader *r, char c)
-{
-	json_skip_space(r);
-	if (r->p < r->end && *r->p == c) {
-		r->p++;
-		return true;
-	}
-	return false;
-}
-
-static int hex_value(char c)
-{
-	if (c >= '0' && c <= '9') {
-		return c - '0';
-	}
-	if (c >= 'a' && c <= 'f') {
-		return c - 'a' + 10;
-	}
-	if (c >= 'A' && c <= 'F') {
-		return c - 'A' + 10;
-	}
-	return -1;
-}
-
-/*
- * A string, decoded into `out` (NUL-terminated; it must hold the whole
- * payload), or skipped when `out` is NULL. Escapes that don't stand for a
- * printable ASCII character decode to DEL, which no command name contains.
- */
-static bool json_read_string(struct json_reader *r, char *out)
-{
-	size_t n = 0;
-
-	if (!json_expect(r, '"')) {
-		return false;
-	}
-	while (r->p < r->end && *r->p != '"') {
-		unsigned char c = (unsigned char)*r->p++;
-
-		if (c < 0x20) {
-			return false;
-		}
-		if (c == '\\') {
-			if (r->p == r->end) {
-				return false;
-			}
-			c = (unsigned char)*r->p++;
-			switch (c) {
-			case '"':
-			case '\\':
-			case '/':
-				break;
-			case 'b':
-			case 'f':
-			case 'n':
-			case 'r':
-			case 't':
-				c = 0x7f;
-				break;
-			case 'u': {
-				unsigned int v = 0;
-
-				for (int i = 0; i < 4; i++) {
-					int h = r->p < r->end ? hex_value(*r->p++) : -1;
-
-					if (h < 0) {
-						return false;
-					}
-					v = v << 4 | (unsigned int)h;
-				}
-				c = v >= 0x20 && v < 0x7f ? (unsigned char)v : 0x7f;
-				break;
-			}
-			default:
-				return false;
-			}
-		}
-		if (out != NULL) {
-			out[n++] = (char)c;
-		}
-	}
-	if (out != NULL) {
-		out[n] = '\0';
-	}
-	return json_expect(r, '"');
-}
-
-static bool json_skip_value(struct json_reader *r, int depth);
-
-/* The members of an object or the items of an array, up to `close`. */
-static bool json_skip_container(struct json_reader *r, char close, int depth)
-{
-	if (json_expect(r, close)) {
-		return true;
-	}
-	do {
-		if (close == '}' && (!json_read_string(r, NULL) || !json_expect(r, ':'))) {
-			return false;
-		}
-		if (!json_skip_value(r, depth)) {
-			return false;
-		}
-	} while (json_expect(r, ','));
-	return json_expect(r, close);
-}
-
-static bool json_skip_literal(struct json_reader *r, const char *literal)
-{
-	size_t len = strlen(literal);
-
-	if ((size_t)(r->end - r->p) < len || memcmp(r->p, literal, len) != 0) {
-		return false;
-	}
-	r->p += len;
-	return true;
-}
-
-/* Any value, checked only loosely: the Node ignores members it doesn't know. */
-static bool json_skip_value(struct json_reader *r, int depth)
-{
-	json_skip_space(r);
-	if (r->p == r->end || depth > JSON_MAX_DEPTH) {
-		return false;
-	}
-	switch (*r->p) {
-	case '"':
-		return json_read_string(r, NULL);
-	case '{':
-		r->p++;
-		return json_skip_container(r, '}', depth + 1);
-	case '[':
-		r->p++;
-		return json_skip_container(r, ']', depth + 1);
-	case 't':
-		return json_skip_literal(r, "true");
-	case 'f':
-		return json_skip_literal(r, "false");
-	case 'n':
-		return json_skip_literal(r, "null");
-	default: {
-		const char *start = r->p;
-
-		while (r->p < r->end && strchr("+-.0123456789eE", *r->p) != NULL) {
-			r->p++;
-		}
-		return r->p != start;
-	}
-	}
 }
 
 /*
@@ -434,6 +190,7 @@ static void on_command(struct node_core *core, const struct node_event *event)
 
 	if (core->broker_state != NODE_BROKER_CONNECTED) {
 		/* Queued before the connection went: not meant for now. */
+		warn(core, "ignored a command from a closed Broker connection");
 		return;
 	}
 	if (event->command.retained) {
@@ -441,6 +198,7 @@ static void on_command(struct node_core *core, const struct node_event *event)
 		warn(core, "ignored a retained command");
 		return;
 	}
+	/* len over the maximum would be an adapter bug; don't read past payload. */
 	if (event->command.truncated || event->command.len > NODE_COMMAND_MAX_LEN ||
 	    !parse_command(event->command.payload, event->command.len, name)) {
 		warn(core, "ignored a malformed command");
@@ -463,7 +221,10 @@ static void subscribe_commands(struct node_core *core)
 	char topic[TOPIC_MAX];
 
 	node_topic(core, topic, "command");
-	(void)core->ports->mqtt_subscribe(core->ports->ctx, topic);
+	if (core->ports->mqtt_subscribe_commands(core->ports->ctx, topic) != 0) {
+		/* The next connection tries again. */
+		warn(core, "can't subscribe to commands on this Broker connection");
+	}
 }
 
 static void on_broker_connected(struct node_core *core)

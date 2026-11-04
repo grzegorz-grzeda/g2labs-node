@@ -72,7 +72,7 @@ The Node subscribes to its command topic (QoS 0) every time it connects. Publish
 | `reboot` | Publishes `offline` on `availability`, disconnects, and reboots 1 s later. It comes back `online` as usual. |
 | `publish_status` | Publishes its `status` at once. The periodic status then follows 60 s after it. |
 
-The payload is a JSON object of at most 128 bytes. The Node ignores members it doesn't know, so later commands can carry more fields. It ignores and logs (on the UART console) every other message on the topic, and none of these can crash it:
+The payload is a JSON object of at most 128 bytes. `contract/schemas/command.schema.json` lists the members there are today; new ones are added to it as optional members (ADR-0005), and the Node ignores members it doesn't know, so older Nodes keep working. It ignores and logs (on the UART console) every other message on the topic, and none of these can crash it:
 
 - an unknown command name;
 - a malformed payload: not a JSON object, no string `command` member, `command` given twice, or longer than 128 bytes;

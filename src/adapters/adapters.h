@@ -18,7 +18,7 @@ int mqtt_adapter_connect(void *ctx, const struct node_mqtt_connect *params);
 int mqtt_adapter_disconnect(void *ctx);
 int mqtt_adapter_publish(void *ctx, const char *topic, const void *payload, size_t len,
 			 bool retained);
-int mqtt_adapter_subscribe(void *ctx, const char *topic);
+int mqtt_adapter_subscribe_commands(void *ctx, const char *topic);
 
 void system_adapter_reboot(void *ctx);
 void system_adapter_log_warning(void *ctx, const char *message);

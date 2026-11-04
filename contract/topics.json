@@ -8,10 +8,7 @@
       "publisher": "node",
       "retained": true,
       "encoding": "text",
-      "values": [
-        "online",
-        "offline"
-      ],
+      "values": ["online", "offline"],
       "examples": "examples/availability",
       "meaning": "Whether the Node is connected to the Broker; offline is also its last will."
     },
@@ -38,10 +35,7 @@
       "publisher": "hub",
       "retained": true,
       "encoding": "text",
-      "values": [
-        "online",
-        "offline"
-      ],
+      "values": ["online", "offline"],
       "examples": "examples/hub-availability",
       "meaning": "Whether the Hub is connected to the Broker; offline is also its last will."
     }
