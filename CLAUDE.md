@@ -97,7 +97,9 @@ docker build -t g2labs-node-service .                # the container image
 
 `.github/workflows/ci.yml` runs the core tests and both sysbuild builds on every push and pull request. It recreates a minimal workspace pinned to `ZEPHYR_REVISION` (with only the west modules in `WEST_PROJECT_FILTER`) and Zephyr SDK `ZEPHYR_SDK_VERSION`. When the local workspace's Zephyr or SDK is updated, bump those values in the same change.
 
-The `hub` job builds and tests `service/` and builds its image for amd64 and arm64 (under QEMU, loading better-sqlite3 in each). On a `v*` tag, `hub-image` pushes the multi-arch image to `ghcr.io/<owner>/g2labs-node-service` (a Release Candidate `vX.Y.Z-rcN` as its version only, a stable Release as its version and `latest`).
+In `ci.yml`, the `hub` job builds and tests `service/` and builds its image for amd64 and arm64 (under QEMU, loading better-sqlite3 in each). On a `v*` tag, `hub-image` pushes the multi-arch image to `ghcr.io/<owner>/g2labs-node-service` (a Release Candidate `vX.Y.Z-rcN` as its version only, a stable Release as its version and `latest`).
+
+`.github/workflows/human-gate.yml` sets the `human-gate` status on every PR: it fails while the PR touches a path in `.github/gated-paths` or carries `ready-for-human`, until the maintainer adds `human-approved` (logic and tests in `.github/scripts/`).
 
 ## Agent skills
 
