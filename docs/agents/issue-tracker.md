@@ -45,6 +45,7 @@ created: 2026-11-05
 
 - **Create an issue**: take the next number (one more than the highest `NNNN` in `docs/issues/`) and write the file with `status: open` and `created: <today>`.
 - **Read an issue**: read `docs/issues/NNNN-*.md`.
+- **List the workable backlog**: the `open-tickets` skill, or `python3 .claude/skills/open-tickets/tickets.py` (`--all` adds blocked tickets).
 - **List issues**: `grep -l '^status: open' docs/issues/*.md`. Filter by label with `grep -l 'labels: .*ready-for-agent' …` or by parent with `grep -l '^parent: 17$' …`.
 - **Make an issue a sub-issue of a parent**: set `parent:` in the child's front matter.
 - **Comment on an issue**: append `### <date> — <author>` and the text under `## Comments` (create that section at the end of the file if it's missing).

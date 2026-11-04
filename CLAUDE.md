@@ -113,7 +113,7 @@ The `review-pr` project skill (`.claude/skills/review-pr/`) reviews a PR with fr
 
 ### Issue tracker
 
-Issues are Markdown files in `docs/issues/`, one per issue, with status, labels, parent and blockers in front matter. `#N` means `docs/issues/NNNN-*.md`. See `docs/agents/issue-tracker.md`.
+Issues are Markdown files in `docs/issues/`, one per issue, with status, labels, parent and blockers in front matter. `#N` means `docs/issues/NNNN-*.md`. See `docs/agents/issue-tracker.md`. The `open-tickets` project skill (`.claude/skills/open-tickets/`) lists and summarizes the open, unblocked tickets.
 
 ### Triage labels
 
