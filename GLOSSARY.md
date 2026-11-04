@@ -1,6 +1,6 @@
 # g2labs-node
 
-Firmware for a generic, always-powered IoT node that gathers readings from attached and nearby sensors and exchanges data and commands with a self-hosted central system.
+Firmware for a generic, always-powered IoT node that gathers readings from attached and nearby sensors, and the self-hosted Hub that manages and observes those nodes.
 
 ## Language
 
@@ -24,10 +24,34 @@ _Avoid_: Saved network, profile, credential
 Setting a Node's friendly name, Known Networks and Broker from a computer over the Node's serial shell.
 _Avoid_: Configuration, setup, onboarding
 
+**Status**:
+A Node's periodic report of its own health: firmware version, board, uptime, Known Network, link quality, memory.
+_Avoid_: Telemetry, heartbeat, diagnostics
+
 **Sighting**:
-One reception of a BLE advertisement by a Node: who sent it, how strongly it was heard, and what it said. Nodes report every Sighting; filtering and deduplication happen outside the Node.
-_Avoid_: Scan result, detection, beacon, reading
+One reception of a BLE advertisement by a Node: who sent it, how strongly it was heard, and what it said, undecoded. Nodes report every Sighting; filtering, deduplication and decoding happen in the Hub.
+_Avoid_: Scan result, detection, beacon, reading, telemetry
+
+**Hub**:
+The self-hosted service that manages and observes all Nodes through the Broker. Home Assistant is one of its integrations, not its master.
+_Avoid_: Server, backend, g2labs-node-service (that is the package name, not the concept)
 
 **Aggregator**:
-The service outside this repo that consumes Sightings from all Nodes via the Broker, deduplicating, throttling and positioning them.
+The part of the Hub that consumes Sightings from all Nodes, deduplicating, throttling and positioning them.
 _Avoid_: Collector, backend, processor
+
+**Advertiser**:
+Any BLE transmitter the Hub has seen in Sightings, identified by its address. Transient: forgotten after a period of silence.
+_Avoid_: Device, beacon, tag
+
+**Sensor**:
+An Advertiser whose data the Hub can decode. It starts Discovered; once the user adopts it, the Hub tracks it and exposes it to its integrations, marks it Unavailable while no Node hears it, and forgets it when Removed.
+_Avoid_: Device, beacon, tag, TH sensor (a TH sensor is just one kind of Sensor)
+
+**Update Policy**:
+The fleet-wide rule for how the Hub updates Node firmware: Manual (the user picks an image and a Node) or Follow Releases (the Hub rolls out each new stable release to every Node).
+_Avoid_: OTA mode, update strategy
+
+**Hold**:
+A per-Node flag that excludes the Node from automatic rollouts under the Update Policy. Manual updates still apply.
+_Avoid_: Pin, freeze, exclude

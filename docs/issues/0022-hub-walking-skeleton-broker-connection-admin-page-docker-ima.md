@@ -1,0 +1,27 @@
+---
+number: 22
+title: "Hub walking skeleton: Broker connection, admin page, Docker image"
+status: open
+labels: [ready-for-agent]
+parent: 17
+blocked_by: []
+created: 2026-11-04
+---
+
+# Hub walking skeleton: Broker connection, admin page, Docker image
+
+## What to build
+
+The thinnest Hub that runs end to end: a TypeScript service in `service/` that connects to the Broker, announces itself, serves a password-protected admin page, and ships as a multi-arch Docker image.
+
+## Acceptance criteria
+
+- [ ] `service/` holds a TypeScript Node.js service and a React + Vite admin page that it builds and serves itself
+- [ ] Configured by env vars: Broker URL, username and password, admin password, data directory
+- [ ] Connects to the Broker and publishes retained `online` on `g2labs/hub/availability`, with a last will `offline`; reconnects after a lost connection
+- [ ] The admin page requires the admin password and keeps a session cookie; it shows whether the Hub is connected to the Broker
+- [ ] Opens a SQLite database (WAL mode) in the data directory, with schema migrations
+- [ ] A Dockerfile builds an `arm64` and `amd64` image; `service/docker-compose.example.yml` runs it with `network_mode: host` next to Mosquitto
+- [ ] CI builds and tests the Hub on every push and publishes the image to GHCR on `v*` tags
+- [ ] `g2labs/hub/availability` is documented in `docs/mqtt.md` and has a schema in `contract/`
+- [ ] CLAUDE.md describes `service/` and its commands

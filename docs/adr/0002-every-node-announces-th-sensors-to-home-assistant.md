@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0003
+---
+
 # Every Node announces TH sensors to Home Assistant under a sensor-derived ID
 
 Each Node that decodes a BTHome temperature/humidity sensor publishes Home Assistant MQTT discovery for it, using a device and entity ID derived from the sensor's MAC address rather than the Node's. Because every Node sends an identical announcement, HA merges them into one device, and whichever Node heard the sensor most recently updates its values. This makes TH sensors appear in HA without the Aggregator existing yet, while respecting [ADR-0001](0001-nodes-report-every-sighting-unfiltered.md): Nodes still don't coordinate or deduplicate between themselves. A Node setting turns the behaviour off, so the Aggregator can take over announcing sensors later.

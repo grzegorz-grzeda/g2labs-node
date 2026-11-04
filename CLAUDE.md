@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-g2labs-node is a Zephyr RTOS-based IoT node application (MIT licensed). The product spec is GitHub issue #1; domain terms are in `GLOSSARY.md`.
+g2labs-node is a Zephyr RTOS-based IoT node application (MIT licensed). The product specs are #1 (the Node firmware) and #17 (the Hub) in `docs/issues/`; domain terms are in `GLOSSARY.md`.
 
 ## Code layout
 
@@ -86,7 +86,7 @@ Build and twister output (`build*/`, `twister-out*/`) is git-ignored.
 
 ### Issue tracker
 
-Issues are tracked in GitHub Issues for `grzegorz-grzeda/g2labs-node` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues are Markdown files in `docs/issues/`, one per issue, with status, labels, parent and blockers in front matter. `#N` means `docs/issues/NNNN-*.md`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
