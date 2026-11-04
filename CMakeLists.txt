@@ -10,5 +10,6 @@ target_sources(app PRIVATE
   src/shell.c
   src/adapters/image_mcuboot.c
   src/adapters/mqtt_stub.c
-  src/adapters/wifi_stub.c
+  src/adapters/settings.c
+  src/adapters/wifi.c
 )

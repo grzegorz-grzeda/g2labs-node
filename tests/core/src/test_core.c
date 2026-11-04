@@ -20,7 +20,8 @@ ZTEST(node_core, test_started_node_without_settings_or_events_stays_silent)
 {
 	const struct node_info info = {.fw_version = "1.2.3"};
 
-	node_core_start(&core, &fake.ports, &info);
+	node_core_init(&core, &fake.ports, &info);
+	node_core_start(&core);
 
 	zassert_equal(fake.publish_count, 0, "unexpected MQTT publish");
 	zassert_equal(fake.wifi_scan_count, 0, "unexpected Wi-Fi scan");
@@ -32,7 +33,8 @@ ZTEST(node_core, test_node_reports_the_firmware_version_it_was_started_with)
 {
 	const struct node_info info = {.fw_version = "0.1.0-dev"};
 
-	node_core_start(&core, &fake.ports, &info);
+	node_core_init(&core, &fake.ports, &info);
+	node_core_start(&core);
 
 	zassert_str_equal(node_core_fw_version(&core), "0.1.0-dev");
 }

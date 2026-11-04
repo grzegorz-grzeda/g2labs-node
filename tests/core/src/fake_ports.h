@@ -29,7 +29,13 @@ struct fake_ports {
 	size_t publish_count;
 	size_t wifi_scan_count;
 	size_t wifi_connect_count;
+	char last_connect_ssid[NODE_SSID_MAX_LEN + 1];
+	char last_connect_password[NODE_PASSWORD_MAX_LEN + 1];
 	size_t image_confirm_count;
+
+	/* Return codes the fake Wi-Fi requests give back (0 = accepted). */
+	int wifi_scan_result;
+	int wifi_connect_result;
 };
 
 /* Reset all recordings and wire the fake into fake->ports. */

@@ -30,17 +30,17 @@ static int fake_wifi_scan(void *ctx)
 	struct fake_ports *fake = ctx;
 
 	fake->wifi_scan_count++;
-	return 0;
+	return fake->wifi_scan_result;
 }
 
 static int fake_wifi_connect(void *ctx, const char *ssid, const char *password)
 {
 	struct fake_ports *fake = ctx;
 
-	ARG_UNUSED(ssid);
-	ARG_UNUSED(password);
 	fake->wifi_connect_count++;
-	return 0;
+	strncpy(fake->last_connect_ssid, ssid, sizeof(fake->last_connect_ssid) - 1);
+	strncpy(fake->last_connect_password, password, sizeof(fake->last_connect_password) - 1);
+	return fake->wifi_connect_result;
 }
 
 static int fake_image_confirm(void *ctx)
