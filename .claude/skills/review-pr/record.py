@@ -80,7 +80,11 @@ def repo():
 
 
 def head_sha(r, pr):
-    return gh("api", f"repos/{r}/pulls/{pr}", "--jq", ".head.sha").strip()
+    """The PR's head commit; exits if the PR is no longer open."""
+    state, sha = gh("api", f"repos/{r}/pulls/{pr}", "--jq", "[.state, .head.sha] | @tsv").split()
+    if state != "open":
+        sys.exit(f"PR #{pr} is {state}; nothing to review.")
+    return sha
 
 
 def comment_bodies(r, pr):
@@ -120,9 +124,10 @@ def cmd_finish(args):
     body = render_comment(round_no, args.sha, args.verdict, args.report.read_text(), failures)
     gh("pr", "comment", str(args.pr), "--body-file", "-", input=body)
     set_status(r, args.sha, args.verdict, status_description(round_no, args.verdict), args.pr)
-    if args.verdict == "failure" and failures >= MAX_FAILED_ROUNDS:
+    escalate = args.verdict == "failure" and failures >= MAX_FAILED_ROUNDS
+    if escalate:
         gh("pr", "edit", str(args.pr), "--add-label", NEEDS_HUMAN)
-    print(f"round {round_no}: {args.verdict}" + (f", labelled {NEEDS_HUMAN}" if failures >= MAX_FAILED_ROUNDS and args.verdict == "failure" else ""))
+    print(f"round {round_no}: {args.verdict}" + (f", labelled {NEEDS_HUMAN}" if escalate else ""))
     return 0
 
 

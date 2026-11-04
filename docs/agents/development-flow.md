@@ -59,7 +59,7 @@ The hardware smoke test (#16) needs real boards and is not a merge check; it gat
 
 - Every PR is reviewed by a separate session or subagent with fresh context, not by the one that wrote it, using the project skill `review-pr` (`.claude/skills/review-pr/`). It runs the `code-review` skill against the PR's head: Standards (CLAUDE.md, ADRs, glossary) and Spec (the linked issue).
 - **How the author invokes it**: after opening the PR (and again after each push that addresses findings), start a reviewer that doesn't share your context. Use a subagent with the Agent tool (a general-purpose agent, never a fork) or a new session, with only this prompt: `Use the review-pr skill on PR #<N>.` Don't add your own summary of the change: the reviewer works from the PR, the issue and the repo.
-- The reviewer posts its findings as a PR comment headed with the round number and sets the `claude-review` commit status to `success` or `failure` on the head commit it reviewed. Commit statuses belong to one commit, so a new push leaves `claude-review` waiting ("Expected") on the new head until the reviewer runs again.
+- The reviewer posts its findings as a PR comment headed with the round number and sets the `claude-review` commit status to `success` or `failure` on the head commit it reviewed. Commit statuses belong to one commit, so a new push leaves the new head without `claude-review`; since it is a required check on `main`, the PR waits ("Expected") until the reviewer runs again.
 - On failure the author fixes the findings and the reviewer runs again on the new head. After 3 failed rounds the reviewer labels the PR `ready-for-human` and it stops.
 
 ## Versioning

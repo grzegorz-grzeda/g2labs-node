@@ -15,12 +15,12 @@ You are the reviewer for one PR. You did not write it: start only from the PR, i
 python3 .claude/skills/review-pr/record.py start <PR>     # prints "<head-sha> <round>"
 ```
 
-This sets `claude-review` to pending on the head commit. Review exactly that SHA. If the PR is closed or merged, stop and say so.
+This sets `claude-review` to pending on the head commit. Review exactly that SHA. It refuses a closed or merged PR; then stop and say so.
 
 ```bash
 gh pr view <PR> --json title,body,headRefName,baseRefName,labels,files
 git fetch origin main "pull/<PR>/head"
-git worktree add --detach "$TMPDIR/review-pr-<PR>" <head-sha>     # any scratch path
+git worktree add --detach "${TMPDIR:-/tmp}/review-pr-<PR>" <head-sha>
 ```
 
 Work in that worktree: the fixed point is `origin/main` and HEAD is the PR head. Remove the worktree when you're done (`git worktree remove --force <path>`).
