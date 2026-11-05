@@ -17,6 +17,10 @@
       "description": "Firmware version, as in VERSION.",
       "type": "string"
     },
+    "board": {
+      "description": "The Zephyr board target the image was built for, e.g. esp32c6_devkitc/esp32c6/hpcore. Left out by older firmware.",
+      "type": "string"
+    },
     "uptime_s": {
       "description": "Seconds since boot.",
       "type": "integer",
@@ -25,6 +29,11 @@
     "network": {
       "description": "SSID of the current Known Network.",
       "type": "string"
+    },
+    "ip": {
+      "description": "The Node's IPv4 address as a dotted string; null when the Node can't tell. Left out by older firmware.",
+      "type": ["string", "null"],
+      "pattern": "^(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}$"
     },
     "rssi": {
       "description": "RSSI of the Wi-Fi link in dBm; null when the Wi-Fi driver can't report it.",

@@ -8,12 +8,14 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include <node/core.h>
 
 #define FAKE_MAX_PUBLISHES 32
 #define FAKE_TOPIC_MAX     128
-#define FAKE_PAYLOAD_MAX   512
+/* At least the core's STATUS_MAX, so a whole Status is recorded. */
+#define FAKE_PAYLOAD_MAX   768
 
 struct fake_publish {
 	char topic[FAKE_TOPIC_MAX];
@@ -57,9 +59,14 @@ struct fake_ports {
 	size_t warning_count;
 	char last_warning[FAKE_PAYLOAD_MAX];
 
-	/* What the fake platform reports: link RSSI (or rssi_result), free memory. */
+	/*
+	 * What the fake platform reports: link RSSI (or rssi_result), IPv4
+	 * address (or ipv4_result), free memory.
+	 */
 	int rssi;
 	int rssi_result;
+	uint8_t ipv4[NODE_IPV4_LEN];
+	int ipv4_result;
 	size_t free_memory;
 
 	/* Return codes the fake Wi-Fi requests give back (0 = accepted). */

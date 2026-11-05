@@ -2,8 +2,10 @@
   "node_id": "404cca0ab1f2",
   "name": "Kitchen",
   "fw_version": "0.1.0",
+  "board": "esp32c6_devkitc/esp32c6/hpcore",
   "uptime_s": 83,
   "network": "home",
+  "ip": "192.168.1.42",
   "rssi": -61,
   "free_heap": 54321
 }

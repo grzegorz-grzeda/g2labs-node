@@ -13,6 +13,7 @@ static struct fake_ports fake;
 static struct node_core core;
 static const struct node_info info = {
 	.fw_version = "1.2.3",
+	.board = "esp32c6_devkitc/esp32c6/hpcore",
 	.mac = {0x40, 0x4c, 0xca, 0x0a, 0xb1, 0xf2},
 };
 static int64_t now_ms;
