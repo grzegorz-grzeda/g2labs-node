@@ -17,7 +17,10 @@ static void before_each(void *fixture)
 {
 	ARG_UNUSED(fixture);
 	fake_ports_init(&fake);
-	info = (struct node_info){.fw_version = "1.2.3"};
+	info = (struct node_info){
+		.fw_version = "1.2.3",
+		.board = "esp32c6_devkitc/esp32c6/hpcore",
+	};
 	node_core_init(&core, &fake.ports, &info);
 	now_ms = 0;
 	node_core_tick(&core, now_ms);

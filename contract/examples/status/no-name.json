@@ -1,8 +1,10 @@
 {
   "node_id": "404cca0ab1f2",
   "fw_version": "0.1.0",
+  "board": "esp32s3_devkitc/esp32s3/procpu",
   "uptime_s": 0,
   "network": "home",
+  "ip": "192.168.1.57",
   "rssi": -72,
   "free_heap": 61440
 }

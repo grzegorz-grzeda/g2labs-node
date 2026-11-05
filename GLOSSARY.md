@@ -25,7 +25,7 @@ Setting a Node's friendly name, Known Networks and Broker from a computer over t
 _Avoid_: Configuration, setup, onboarding
 
 **Status**:
-A Node's periodic report of its own health: firmware version, board, uptime, Known Network, link quality, memory.
+A Node's periodic report of its own health: firmware version, board, uptime, Known Network, IP address, link quality, memory.
 _Avoid_: Telemetry, heartbeat, diagnostics
 
 **Sighting**:

@@ -40,8 +40,10 @@ Published right after `online`, then every 60 s while connected.
   "node_id": "404cca0ab1f2",
   "name": "Kitchen",
   "fw_version": "0.1.0",
+  "board": "esp32c6_devkitc/esp32c6/hpcore",
   "uptime_s": 83,
   "network": "home",
+  "ip": "192.168.1.42",
   "rssi": -61,
   "free_heap": 54321
 }
@@ -52,8 +54,10 @@ Published right after `online`, then every 60 s while connected.
 | `node_id` | string | The Node ID. |
 | `name` | string | The friendly name (`node name set`). Left out when none is set. |
 | `fw_version` | string | Firmware version, as in `VERSION`. |
+| `board` | string | The Zephyr board target the image was built for (`esp32c6_devkitc/esp32c6/hpcore` or `esp32s3_devkitc/esp32s3/procpu`), so the Hub knows which image fits. Left out by older firmware. |
 | `uptime_s` | integer | Seconds since boot. |
 | `network` | string | SSID of the current Known Network. |
+| `ip` | string or `null` | The Node's IPv4 address as a dotted string, for reaching it when mDNS fails; `null` when the Node can't tell. Left out by older firmware. |
 | `rssi` | integer or `null` | RSSI of the Wi-Fi link in dBm; `null` when the Wi-Fi driver can't report it. |
 | `free_heap` | integer | Free heap memory in bytes, summed over all heaps. |
 
