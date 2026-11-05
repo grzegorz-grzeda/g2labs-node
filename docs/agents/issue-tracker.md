@@ -4,7 +4,7 @@ Issues and specs for this repo live as Markdown files in `docs/issues/`, one fil
 
 ## File format
 
-`docs/issues/NNNN-slug.md`, where `NNNN` is the issue number zero-padded to 4 digits and `slug` is the title in lowercase kebab-case, cut to about 60 characters:
+`docs/issues/NNNN-slug.md`, where `NNNN` is the issue number zero-padded to 4 digits and `slug` is the title in lowercase kebab-case, cut to about 60 characters. A closed issue's file is `docs/issues/done-NNNN-slug.md` instead, so the file list alone tells finished issues from live ones:
 
 ```md
 ---
@@ -43,14 +43,14 @@ created: 2026-11-05
 
 ## Conventions
 
-- **Create an issue**: take the next number (one more than the highest `NNNN` in `docs/issues/`) and write the file with `status: open` and `created: <today>`.
-- **Read an issue**: read `docs/issues/NNNN-*.md`.
+- **Create an issue**: take the next number (one more than the highest `NNNN` in `docs/issues/`, `done-` files included) and write the file with `status: open` and `created: <today>`.
+- **Read an issue**: read `docs/issues/NNNN-*.md`, or `docs/issues/done-NNNN-*.md` once it's closed (`ls docs/issues/*NNNN-*` finds either).
 - **List the workable backlog**: the `open-tickets` skill, or `python3 .claude/skills/open-tickets/tickets.py` (`--all` adds blocked tickets).
-- **List issues**: `grep -l '^status: open' docs/issues/*.md`. Filter by label with `grep -l 'labels: .*ready-for-agent' …` or by parent with `grep -l '^parent: 17$' …`.
+- **List issues**: the open ones are the files without the `done-` prefix (`ls docs/issues/[0-9]*.md`), or `grep -l '^status: open' docs/issues/*.md`. Filter by label with `grep -l 'labels: .*ready-for-agent' …` or by parent with `grep -l '^parent: 17$' …`.
 - **Make an issue a sub-issue of a parent**: set `parent:` in the child's front matter.
 - **Comment on an issue**: append `### <date> — <author>` and the text under `## Comments` (create that section at the end of the file if it's missing).
 - **Apply / remove labels**: edit the `labels:` list.
-- **Close**: set `status: closed`, `closed_reason:` and `closed:`, and append a comment saying why. Close an issue in the same commit as the work that finishes it.
+- **Close**: set `status: closed`, `closed_reason:` and `closed:`, append a comment saying why, and rename the file with the `done-` prefix (`git mv docs/issues/NNNN-slug.md docs/issues/done-NNNN-slug.md`), whatever the `closed_reason`. Close an issue in the same commit as the work that finishes it. Reopening one drops the prefix again. The `open-tickets` tests check that the prefix and `status` agree.
 
 ## Pull requests as a triage surface
 

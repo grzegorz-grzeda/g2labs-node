@@ -27,7 +27,7 @@ Work in that worktree: the fixed point is `origin/main` and HEAD is the PR head.
 
 ## 2. Find the spec
 
-The PR body names the issue (`Closes #N`). Read `docs/issues/NNNN-*.md` as it is in the PR head, because the PR may close it. If the PR names no issue, that is a Spec finding in itself: the development flow requires one, and the only exceptions are release (`release/vX.Y.Z`) and revert PRs. For those, use the PR body as the spec.
+The PR body names the issue (`Closes #N`). Read `docs/issues/NNNN-*.md` as it is in the PR head, because the PR may close it; a closed issue's file is `docs/issues/done-NNNN-*.md`. If the PR names no issue, that is a Spec finding in itself: the development flow requires one, and the only exceptions are release (`release/vX.Y.Z`) and revert PRs. For those, use the PR body as the spec.
 
 ## 3. Review
 
