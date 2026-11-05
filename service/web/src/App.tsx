@@ -1,7 +1,20 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import type { HubStatus as Status } from '../../src/api.js';
+import { NodeDetailPage, NodeListPage } from './Nodes';
 
-interface Status {
-  broker: { url: string; connected: boolean };
+/** The page to show, from the URL's hash: #/ or #/nodes/<node-id>. */
+function useRoute(): { nodeId?: string } {
+  const parse = () => {
+    const match = /^#\/nodes\/([^/]+)$/.exec(location.hash);
+    return match ? { nodeId: decodeURIComponent(match[1]) } : {};
+  };
+  const [route, setRoute] = useState(parse);
+  useEffect(() => {
+    const onChange = () => setRoute(parse());
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
+  return route;
 }
 
 type State =
@@ -14,6 +27,7 @@ const POLL_MS = 2000;
 
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const route = useRoute();
 
   const refresh = useCallback(async () => {
     try {
@@ -59,7 +73,12 @@ export function App() {
       {state.kind === 'loading' && <p>Loading…</p>}
       {state.kind === 'error' && <p className="error">{state.message}</p>}
       {state.kind === 'login' && <Login error={state.error} onLoggedIn={refresh} onError={(error) => setState({ kind: 'login', error })} />}
-      {state.kind === 'ready' && <Overview status={state.status} />}
+      {state.kind === 'ready' && (
+        <>
+          <Overview status={state.status} />
+          {route.nodeId ? <NodeDetailPage key={route.nodeId} nodeId={route.nodeId} /> : <NodeListPage />}
+        </>
+      )}
     </main>
   );
 }
@@ -93,13 +112,19 @@ function Login(props: { error?: string; onLoggedIn: () => void; onError: (error:
 
 function Overview({ status }: { status: Status }) {
   const { connected, url } = status.broker;
+  const invalid = status.mqtt.invalid_messages;
   return (
     <section>
-      <h2>Broker</h2>
       <p>
         <span className={connected ? 'dot ok' : 'dot bad'} aria-hidden="true" />
-        {connected ? 'Connected' : 'Not connected'} to <code>{url}</code>
+        Broker: {connected ? 'connected' : 'not connected'} to <code>{url}</code>
       </p>
+      {invalid > 0 && (
+        <p className="error">
+          {invalid} invalid {invalid === 1 ? 'message' : 'messages'} from Nodes ignored since the Hub started (see the
+          Hub's log).
+        </p>
+      )}
     </section>
   );
 }
