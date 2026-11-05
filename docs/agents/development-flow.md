@@ -5,7 +5,7 @@ How changes get from an issue to the fleet. Claude does the development, reviews
 Two events, never confused:
 
 - **Integration**: a PR squash-merged into `main`. `main` is always green and shippable, but merging delivers nothing.
-- **Delivery**: a stable Release (a `v*` tag without a suffix). Follow Releases rolls it out to the fleet. Release Candidates (`v*-rcN`) are skipped by the fleet unless allowed.
+- **Delivery**: a stable Release (a `v*` tag without a suffix). Follow Releases rolls it out to the fleet. Release Candidates (`v*-rc.N`) are skipped by the fleet unless allowed.
 
 ## Picking up work
 
@@ -61,6 +61,18 @@ The hardware smoke test (#16) needs real boards and is not a merge check; it gat
 
 - `VERSION` on `main` is always the next version with `EXTRAVERSION = dev`. Feature and fix PRs never touch it.
 - Semver. While at 0.x: minor for new features, patch for fixes only.
+- Every version is a [SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) version without build metadata, of one of three shapes:
+
+  | Version | What | `VERSION` | Tag |
+  |---|---|---|---|
+  | `X.Y.Z-dev` | `main` between Releases | `EXTRAVERSION = dev` | none |
+  | `X.Y.Z-rc.N` | Release Candidate `N`, from 1 | `X.Y.Z-dev`, the commit it's tagged on | `vX.Y.Z-rc.N` |
+  | `X.Y.Z` | stable Release | `EXTRAVERSION` empty, set by the release PR `release/vX.Y.Z` | `vX.Y.Z` |
+
+  The pre-release identifier is `rc.N`, with a dot, so that `rc.10` sorts after `rc.9`. `VERSION_TWEAK` stays 0: it only reaches MCUboot's image header, never the version.
+- Versions are compared by SemVer 2.0.0 precedence, never as strings: `0.3.0-dev` < `0.3.0-rc.1` < `0.3.0-rc.2` < `0.3.0` < `0.4.0-dev`. That's what "newer" means wherever the Hub decides about an update (#28, #29).
+- A Node reports its version as `fw_version` in its Status (`APP_VERSION_STRING`); for a Release Candidate or a Release that is exactly its tag without the `v`. A Release Candidate's images are built with `EXTRAVERSION = rc.N` set in the build's own copy of `VERSION`, never committed (#20), so they report `X.Y.Z-rc.N`.
+- CI checks the rule with `.github/scripts/check_version.py`: the committed `VERSION`, the branch of a release PR, and every tag (a tag that isn't `v` + an allowed version fails).
 - A release PR sets `VERSION` to the release (no `-dev`). The first PR after the Release bumps to the next `-dev`.
 - One version and one tag ship both the Node firmware and the Hub image.
 
@@ -69,12 +81,12 @@ The hardware smoke test (#16) needs real boards and is not a merge check; it gat
 Each release has a tracking issue, "Release vX.Y.Z", holding its Release Candidates, smoke-test results and Claude's recommendation.
 
 1. **Recommend.** After each merge that changes the firmware, the Hub or the contract, Claude looks at what is unreleased since the last Release and proposes a Release Candidate when any of these holds: a fix for a bug in released firmware has landed; a parent issue's last child has closed; about two weeks of merged work is unreleased. Otherwise it says "not yet".
-2. **Release Candidate.** Claude pushes `vX.Y.Z-rcN` on a commit of `main`. It publishes a pre-release with the per-board images and the Hub image tagged with that version only, never `latest`.
+2. **Release Candidate.** Claude pushes `vX.Y.Z-rc.N` on a commit of `main` whose `VERSION` is `X.Y.Z-dev`, counting `N` from 1. It publishes a pre-release with the per-board images and the Hub image tagged with that version only, never `latest`.
 3. **Smoke test.** The maintainer runs the hardware smoke test on both boards with the RC and records the result on the tracking issue.
 4. **Release PR.** Claude opens `release/vX.Y.Z`: it sets `VERSION`, carries release notes generated from the squash-commit titles since the last Release, links the tracking issue and states its recommendation. It is never auto-merged (`human-gate`).
 5. **Publish.** The maintainer's merge of the release PR publishes the stable Release (tag, per-board images, manifest, Hub image as that version and `latest`). Closing it unmerged means "not now".
 
 ## When something breaks
 
-- **`main` goes red** after a merge, or **a Release Candidate fails** its smoke test: Claude first opens a revert PR (`revert/<issue>-<slug>`, normal checks, auto-merged), then opens an issue for the real fix. The next attempt at the same version is the next `rcN`.
+- **`main` goes red** after a merge, or **a Release Candidate fails** its smoke test: Claude first opens a revert PR (`revert/<issue>-<slug>`, normal checks, auto-merged), then opens an issue for the real fix. The next attempt at the same version is the next `rc.N`.
 - **A Rollout stops** at a failed Node: the Hub halts it (#29). The fix goes through the same flow as a patch Release.

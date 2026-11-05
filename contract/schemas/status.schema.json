@@ -14,7 +14,7 @@
       "type": "string"
     },
     "fw_version": {
-      "description": "Firmware version, as in VERSION.",
+      "description": "Firmware version, as in VERSION: SemVer 2.0.0 without build metadata (0.3.0-dev, 0.3.0-rc.1, 0.3.0), compared by SemVer precedence. Firmware built before #42 appended +0.",
       "type": "string"
     },
     "board": {
