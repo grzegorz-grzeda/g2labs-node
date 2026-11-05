@@ -3,6 +3,7 @@ number: 19
 title: "mDNS name g2labs-<node-id>.local"
 status: open
 labels: [ready-for-agent]
+assignee: claude
 parent: 1
 blocked_by: []
 created: 2026-11-04
