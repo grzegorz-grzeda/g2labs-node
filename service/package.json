@@ -12,11 +12,13 @@
     "build": "tsc -p tsconfig.json && tsc -p web/tsconfig.json && vite build",
     "start": "node dist/server/main.js",
     "dev": "vite",
-    "test": "tsc -p test/tsconfig.json && vitest run"
+    "test": "tsc -p test/tsconfig.json && vitest run",
+    "contract": "node scripts/gen-contract.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
     "@fastify/static": "^10.1.9",
+    "ajv": "^8.20.0",
     "better-sqlite3": "^13.0.3",
     "fastify": "^5.12.8",
     "mqtt": "^5.16.1"

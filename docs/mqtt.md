@@ -88,6 +88,8 @@ Commands get no reply; watch `availability` or `status` for the effect.
 
 The Hub (`service/`) connects with client ID `g2labs-hub`, MQTT 3.1.1, clean session, keepalive 60 s, with the username and password from `HUB_MQTT_USERNAME` / `HUB_MQTT_PASSWORD` (anonymous without them). Its last will is `offline`, retained, on its availability topic. After a failed connect or a lost connection it connects again after `HUB_MQTT_RECONNECT_S` (default 5 s).
 
+It subscribes to `g2labs/+/availability` and `g2labs/+/status` (QoS 1) and registers a Node the first time either arrives, including the retained availability already on the Broker when the Hub starts. It checks every payload against `contract/` (its TypeScript types and schemas are generated from it): a payload that doesn't validate, a Status whose `node_id` isn't the topic's, or a topic whose `<node-id>` isn't a Node ID is logged and counted (the admin page shows the count), never acted on. Fields it doesn't know are dropped, as ADR-0005 needs. An empty availability is the Broker clearing a retained message and is ignored. Forgetting a Node in the admin page publishes an empty retained message on each retained topic the Node publishes (today its `availability`), so it isn't registered again from them; a Node that is still running comes back with its next Status.
+
 | Topic | Retained | Payload |
 |---|---|---|
 | `g2labs/hub/availability` | yes | `online` or `offline` (plain text), QoS 1 |

@@ -3,7 +3,7 @@
 
 import { Aedes } from 'aedes';
 import mqtt, { type MqttClient } from 'mqtt';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { createServer, type Server, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -177,4 +177,115 @@ export class AdminClient {
   status() {
     return this.request('GET', '/api/status');
   }
+
+  nodes() {
+    return this.request('GET', '/api/nodes');
+  }
+
+  node(nodeId: string) {
+    return this.request('GET', `/api/nodes/${nodeId}`);
+  }
+
+  forget(nodeId: string) {
+    return this.request('DELETE', `/api/nodes/${nodeId}`);
+  }
+
+  /** Opens the live event stream; `status` is its HTTP status. */
+  async events(): Promise<EventStream> {
+    const controller = new AbortController();
+    const res = await fetch(this.baseUrl + '/api/events', {
+      headers: this.cookie ? { cookie: this.cookie } : {},
+      signal: controller.signal,
+    });
+    return new EventStream(res, controller);
+  }
+}
+
+export interface ServerEvent {
+  event: string;
+  data: any;
+}
+
+/** A server-sent event stream that records the events it gets. */
+export class EventStream {
+  readonly events: ServerEvent[] = [];
+  readonly status: number;
+
+  constructor(res: Response, private controller: AbortController) {
+    this.status = res.status;
+    if (res.ok && res.body) void this.read(res.body);
+  }
+
+  private async read(body: ReadableStream<Uint8Array>) {
+    const decoder = new TextDecoder();
+    let buffer = '';
+    try {
+      for await (const chunk of body) {
+        buffer += decoder.decode(chunk, { stream: true });
+        let end;
+        while ((end = buffer.indexOf('\n\n')) >= 0) {
+          const block = buffer.slice(0, end);
+          buffer = buffer.slice(end + 2);
+          const fields = Object.fromEntries(
+            block
+              .split('\n')
+              .filter((line) => !line.startsWith(':'))
+              .map((line) => [line.slice(0, line.indexOf(':')), line.slice(line.indexOf(':') + 1).trim()]),
+          );
+          if (fields.event) this.events.push({ event: fields.event, data: JSON.parse(fields.data ?? 'null') });
+        }
+      }
+    } catch {
+      // Aborted by close().
+    }
+  }
+
+  async waitFor(pred: (e: ServerEvent) => boolean, from = 0): Promise<ServerEvent> {
+    return (await eventually(async () => this.events.slice(from).find(pred), (e) => e !== undefined))!;
+  }
+
+  close(): void {
+    this.controller.abort();
+  }
+}
+
+/** Stands in for Nodes: publishes on their topics like the firmware does. */
+export class FakeNodes {
+  private constructor(private client: MqttClient) {}
+
+  static async connect(broker: TestBroker): Promise<FakeNodes> {
+    return new FakeNodes(await mqtt.connectAsync(broker.url, { reconnectPeriod: 0 }));
+  }
+
+  async publish(topic: string, payload: string | object, retain = false): Promise<void> {
+    const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    await this.client.publishAsync(topic, body, { qos: 1, retain });
+  }
+
+  status(status: { node_id: string } & Record<string, unknown>): Promise<void> {
+    return this.publish(`g2labs/${status.node_id}/status`, status);
+  }
+
+  availability(nodeId: string, value: 'online' | 'offline'): Promise<void> {
+    return this.publish(`g2labs/${nodeId}/availability`, value, true);
+  }
+
+  async close(): Promise<void> {
+    await this.client.endAsync(true);
+  }
+}
+
+const EXAMPLES_DIR = new URL('../../contract/examples/', import.meta.url);
+
+/** The example payloads of one topic in contract/examples, by file name. */
+export function contractExamples(dir: string): { file: string; text: string }[] {
+  const url = new URL(`${dir}/`, EXAMPLES_DIR);
+  return readdirSync(url)
+    .sort()
+    .map((file) => ({ file, text: readFileSync(new URL(file, url), 'utf8') }));
+}
+
+/** A copy of a Status example to start a test from. */
+export function statusExample(file = 'named.json'): Record<string, any> & { node_id: string } {
+  return JSON.parse(readFileSync(new URL(`status/${file}`, EXAMPLES_DIR), 'utf8'));
 }

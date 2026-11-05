@@ -14,6 +14,8 @@ export interface Config {
   httpHost: string;
   /** 0 picks a free port. */
   httpPort: number;
+  /** How long Status history is kept. */
+  statusRetentionMs: number;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -47,6 +49,10 @@ export function loadConfig(env: Env): Config {
   if (!Number.isInteger(httpPort) || httpPort > 65535) {
     throw new ConfigError(`HUB_HTTP_PORT must be a TCP port, got "${env.HUB_HTTP_PORT}"`);
   }
+  const retentionDays = number(env, 'HUB_STATUS_RETENTION_DAYS', 30);
+  if (retentionDays <= 0) {
+    throw new ConfigError(`HUB_STATUS_RETENTION_DAYS must be more than 0, got "${env.HUB_STATUS_RETENTION_DAYS}"`);
+  }
   return {
     mqttUrl,
     mqttUsername: nonEmpty(env.HUB_MQTT_USERNAME),
@@ -56,5 +62,6 @@ export function loadConfig(env: Env): Config {
     dataDir: nonEmpty(env.HUB_DATA_DIR) ?? '/data',
     httpHost: nonEmpty(env.HUB_HTTP_HOST) ?? '0.0.0.0',
     httpPort,
+    statusRetentionMs: Math.round(retentionDays * 24 * 3600 * 1000),
   };
 }

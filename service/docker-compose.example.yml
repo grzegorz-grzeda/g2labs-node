@@ -28,6 +28,7 @@ services:
       HUB_MQTT_PASSWORD: change-me
       HUB_ADMIN_PASSWORD: change-me-too
       HUB_HTTP_PORT: "8080"
+      HUB_STATUS_RETENTION_DAYS: "30"   # how long Node Status history is kept
     volumes:
       # The SQLite database. A named volume keeps it across image upgrades.
       # With a bind mount instead, the directory must be writable by uid 1000.

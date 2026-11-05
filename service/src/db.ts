@@ -18,6 +18,22 @@ const migrations: string[] = [
      key   TEXT PRIMARY KEY,
      value TEXT NOT NULL
    ) STRICT;`,
+  // 2: the Node registry and Status history. Times are ms since the epoch;
+  // `status` holds the Node's Status as JSON, as validated by the Hub.
+  `CREATE TABLE nodes (
+     node_id      TEXT PRIMARY KEY,
+     first_seen   INTEGER NOT NULL,
+     last_seen    INTEGER NOT NULL,
+     availability TEXT,
+     status       TEXT
+   ) STRICT;
+   CREATE TABLE status_history (
+     node_id     TEXT NOT NULL REFERENCES nodes (node_id) ON DELETE CASCADE,
+     received_at INTEGER NOT NULL,
+     status      TEXT NOT NULL
+   ) STRICT;
+   CREATE INDEX status_history_by_node ON status_history (node_id, received_at);
+   CREATE INDEX status_history_by_time ON status_history (received_at);`,
 ];
 
 export const DB_FILE = 'hub.db';
