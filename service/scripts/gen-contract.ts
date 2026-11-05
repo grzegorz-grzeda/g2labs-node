@@ -44,6 +44,11 @@ function checkKeywords(schema: Schema, where: string): void {
   }
 }
 
+/** power_state or power-state to PowerState. */
+function pascal(word: string): string {
+  return word.replace(/(^|[-_])(\w)/g, (_m, _sep, c: string) => c.toUpperCase());
+}
+
 function comment(text: unknown, indent: string): string {
   return typeof text === 'string' ? `${indent}/** ${text} */\n` : '';
 }
@@ -106,10 +111,13 @@ export function generateContract(contractDir: string): string {
   }));
   // A type for each text topic's values, named for its publisher and its last
   // topic level: g2labs/<node-id>/availability from a node is NodeAvailability.
+  const named = new Map<string, string>();
   for (const t of topics.topics) {
     if (!t.values) continue;
-    const pascal = (w: string) => w.replace(/(^|[-_])(\w)/g, (_m, _sep, c: string) => c.toUpperCase());
     const name = pascal(t.publisher) + pascal(t.pattern.split('/').at(-1)!);
+    const clash = named.get(name);
+    if (clash !== undefined) fail('topics.json', `two text topics would get the type name ${name}: ${clash} and ${t.pattern}`);
+    named.set(name, t.pattern);
     out += comment(`${t.pattern}: ${t.meaning ?? ''}`.trim(), '');
     out += `export type ${name} = ${t.values.map((v) => JSON.stringify(v)).join(' | ')};\n\n`;
   }
