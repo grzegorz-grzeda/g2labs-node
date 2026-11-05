@@ -10,7 +10,10 @@ export const HUB_CLIENT_ID = 'g2labs-hub';
 
 export interface BrokerConnection {
   readonly connected: boolean;
-  /** Publishes at QoS 1; queued while disconnected. */
+  /**
+   * Publishes at QoS 1. Resolves once the Broker has it; while disconnected,
+   * at once, with the message waiting in the queue for the reconnect.
+   */
   publish(topic: string, payload: string, options?: { retain?: boolean }): Promise<void>;
   /** Publishes `offline` and disconnects. */
   close(): Promise<void>;
@@ -21,7 +24,7 @@ export interface Subscription {
   onMessage(topic: string, payload: Buffer, retained: boolean): void;
 }
 
-export function connectBroker(config: Config, log: (msg: string) => void, subscription?: Subscription): BrokerConnection {
+export function connectBroker(config: Config, log: (msg: string) => void, subscription: Subscription): BrokerConnection {
   const client: MqttClient = mqtt.connect(config.mqttUrl, {
     clientId: HUB_CLIENT_ID,
     username: config.mqttUsername,
@@ -38,15 +41,13 @@ export function connectBroker(config: Config, log: (msg: string) => void, subscr
     log(`connected to the Broker at ${redact(config.mqttUrl)}`);
     client.publish(HUB_AVAILABILITY_TOPIC, 'online', { qos: 1, retain: true });
     // A clean session forgets subscriptions, so subscribe on every connect.
-    if (subscription) {
-      client.subscribe(subscription.topics, { qos: 1 }, (err) => {
-        if (err) log(`subscribing failed: ${err.message}`);
-      });
-    }
+    client.subscribe(subscription.topics, { qos: 1 }, (err) => {
+      if (err) log(`subscribing failed: ${err.message}`);
+    });
   });
   client.on('message', (topic, payload, packet) => {
     try {
-      subscription?.onMessage(topic, payload, packet.retain);
+      subscription.onMessage(topic, payload, packet.retain);
     } catch (err) {
       log(`handling a message on ${topic} failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -59,7 +60,9 @@ export function connectBroker(config: Config, log: (msg: string) => void, subscr
       return client.connected;
     },
     async publish(topic, payload, options = {}) {
-      await client.publishAsync(topic, payload, { qos: 1, retain: options.retain ?? false });
+      const published = client.publishAsync(topic, payload, { qos: 1, retain: options.retain ?? false });
+      if (client.connected) await published;
+      else published.catch((err) => log(`publishing on ${topic} failed: ${err.message}`));
     },
     async close() {
       // A clean disconnect doesn't fire the last will, so say `offline` first.

@@ -14,10 +14,13 @@ export interface HubStatus {
   };
 }
 
+/** A Node's last word on its availability topic; null until it says one. */
+export type Availability = 'online' | 'offline' | null;
+
 /** One entry of GET /api/nodes */
 export interface NodeSummary {
   node_id: string;
-  availability: 'online' | 'offline' | null;
+  availability: Availability;
   first_seen: string;
   last_seen: string;
   /** The latest Status, null until the first one arrives. */

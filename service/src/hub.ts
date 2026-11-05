@@ -34,13 +34,9 @@ export async function startHub(env: Env, options: HubOptions = {}): Promise<Hub>
     now,
     log,
     retentionMs: config.statusRetentionMs,
-    clearRetained: async (topic) => {
-      const published = broker
-        .publish(topic, '', { retain: true })
-        .catch((err) => log(`clearing ${topic} failed: ${err.message}`));
-      // While the Broker is away the publish waits in the queue: don't wait for it.
-      if (broker.connected) await published;
-    },
+    // `broker` is created below, because it feeds the registry; this runs later.
+    clearRetained: (topic) =>
+      broker.publish(topic, '', { retain: true }).catch((err) => log(`clearing ${topic} failed: ${err.message}`)),
   });
   const broker = connectBroker(config, log, {
     topics: NODE_TOPICS,

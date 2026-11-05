@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import type { HubStatus as Status } from '../../src/api.js';
+import type { HubStatus } from '../../src/api.js';
 import { NodeDetailPage, NodeListPage } from './Nodes';
 
 /** The page to show, from the URL's hash: #/ or #/nodes/<node-id>. */
@@ -20,7 +20,7 @@ function useRoute(): { nodeId?: string } {
 type State =
   | { kind: 'loading' }
   | { kind: 'login'; error?: string }
-  | { kind: 'ready'; status: Status }
+  | { kind: 'ready'; status: HubStatus }
   | { kind: 'error'; message: string };
 
 const POLL_MS = 2000;
@@ -37,7 +37,7 @@ export function App() {
         return;
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setState({ kind: 'ready', status: (await res.json()) as Status });
+      setState({ kind: 'ready', status: (await res.json()) as HubStatus });
     } catch (err) {
       setState({ kind: 'error', message: `Can't reach the Hub (${String(err)})` });
     }
@@ -110,7 +110,7 @@ function Login(props: { error?: string; onLoggedIn: () => void; onError: (error:
   );
 }
 
-function Overview({ status }: { status: Status }) {
+function Overview({ status }: { status: HubStatus }) {
   const { connected, url } = status.broker;
   const invalid = status.mqtt.invalid_messages;
   return (

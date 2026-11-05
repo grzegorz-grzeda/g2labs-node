@@ -84,9 +84,10 @@ export function createHttp({ config, broker, nodes, publicDir }: HttpDeps): Fast
 
   app.get('/api/nodes', { preHandler: requireSession }, async (): Promise<NodeList> => ({ nodes: nodes.list() }));
 
+  const noSuchNode = (reply: FastifyReply) => reply.code(404).send({ error: 'no such Node' });
+
   app.get<{ Params: { id: string } }>('/api/nodes/:id', { preHandler: requireSession }, async (req, reply) => {
-    const node = nodes.get(req.params.id);
-    return node ?? reply.code(404).send({ error: 'no such Node' });
+    return nodes.get(req.params.id) ?? noSuchNode(reply);
   });
 
   // Live updates: a server-sent `node` event, with the Node ID, whenever a
@@ -112,7 +113,7 @@ export function createHttp({ config, broker, nodes, publicDir }: HttpDeps): Fast
   });
 
   app.delete<{ Params: { id: string } }>('/api/nodes/:id', { preHandler: requireSession }, async (req, reply) => {
-    return (await nodes.forget(req.params.id)) ? { ok: true } : reply.code(404).send({ error: 'no such Node' });
+    return (await nodes.forget(req.params.id)) ? { ok: true } : noSuchNode(reply);
   });
 
   if (publicDir && existsSync(publicDir)) {

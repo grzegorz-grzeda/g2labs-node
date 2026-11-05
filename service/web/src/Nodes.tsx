@@ -14,13 +14,13 @@ export function useNodeEvents(onChange: (nodeId: string) => void) {
   }, [onChange]);
 }
 
-/** Re-renders every `ms`, for "seen 5 s ago". */
-function useNow(ms = 1000): number {
+/** Re-renders every second, for "seen 5 s ago". */
+function useNow(): number {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), ms);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [ms]);
+  }, []);
   return now;
 }
 

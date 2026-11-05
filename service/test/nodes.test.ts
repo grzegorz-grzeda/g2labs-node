@@ -62,6 +62,27 @@ describe('Node registry', () => {
     },
   );
 
+  it.each(contractExamples('availability').map((e) => [e.file, e.text]))(
+    'registers a Node from its availability (%s)',
+    async (_file, text) => {
+      await start();
+      await nodes.publish('g2labs/a1b2c3d4e5f6/availability', text, true);
+      expect(await listed('a1b2c3d4e5f6')).toMatchObject({ availability: text, status: null });
+    },
+  );
+
+  it.each(contractExamples('hub-availability').map((e) => [e.file, e.text]))(
+    "doesn't take the Hub's own availability for a Node (%s)",
+    async (_file, text) => {
+      await start();
+      await nodes.publish('g2labs/hub/availability', text);
+      await nodes.status(statusExample());
+      await listed(statusExample().node_id);
+      expect((await admin.nodes()).json.nodes).toHaveLength(1);
+      expect((await admin.status()).json.mqtt.invalid_messages).toBe(0);
+    },
+  );
+
   it('registers a Node from its availability, before any Status', async () => {
     await start();
     await nodes.availability('a1b2c3d4e5f6', 'online');
@@ -82,6 +103,18 @@ describe('Node registry', () => {
     await nodes.status(statusExample());
     await listed(statusExample().node_id);
     expect((await admin.nodes()).json.nodes.map((n: any) => n.node_id)).toEqual([statusExample().node_id]);
+  });
+
+  it('does not count a last will offline as the Node being seen', async () => {
+    let clock = Date.parse('2026-11-01T10:00:00Z');
+    await start({}, () => clock);
+    await nodes.status(statusExample());
+    await listed('404cca0ab1f2');
+    clock += 600_000;
+    await nodes.publish('g2labs/404cca0ab1f2/availability', 'offline');
+    expect(await listed('404cca0ab1f2', (n) => n.availability === 'offline')).toMatchObject({
+      last_seen: '2026-11-01T10:00:00.000Z',
+    });
   });
 
   it('keeps a Node\'s latest Status and availability side by side, and when it was last seen', async () => {
@@ -256,9 +289,9 @@ describe('Forget', () => {
       await late.close();
     }
 
-    // Back with a fresh history when it reports again.
+    // Back, online, with a fresh history when it reports again.
     await nodes.status({ ...statusExample(), uptime_s: 2 });
-    await listed('404cca0ab1f2');
+    expect(await listed('404cca0ab1f2')).toMatchObject({ availability: 'online' });
     expect((await admin.node('404cca0ab1f2')).json.history.map((p: any) => p.uptime_s)).toEqual([2]);
   });
 

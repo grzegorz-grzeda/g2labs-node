@@ -4,10 +4,10 @@
 import type { Db } from './db.js';
 import { parseStatus } from './contract.js';
 import type { Status } from './contract.generated.js';
-import { topics } from './contract.generated.js';
-import type { NodeDetail, NodeSummary } from './api.js';
+import { statusSchema, topics } from './contract.generated.js';
+import type { Availability, NodeDetail, NodeSummary } from './api.js';
 
-const NODE_ID = /^[0-9a-f]{12}$/;
+const NODE_ID = new RegExp(statusSchema.properties.node_id.pattern);
 
 export const NODE_TOPICS = ['g2labs/+/availability', 'g2labs/+/status'];
 
@@ -15,7 +15,7 @@ interface NodeRow {
   node_id: string;
   first_seen: number;
   last_seen: number;
-  availability: 'online' | 'offline' | null;
+  availability: Availability;
   status: string | null;
 }
 
@@ -84,7 +84,7 @@ export class NodeRegistry {
   }
 
   /** Takes in one message from a topic in NODE_TOPICS. */
-  handleMessage(topic: string, payload: Buffer, retained = false): void {
+  handleMessage(topic: string, payload: Buffer, retained: boolean): void {
     const match = /^g2labs\/([^/]+)\/(availability|status)$/.exec(topic);
     if (!match) return;
     const [, nodeId, kind] = match;
@@ -106,7 +106,10 @@ export class NodeRegistry {
     // Empty is the Broker clearing a retained message, as Forget does.
     if (payload === '') return undefined;
     if (payload !== 'online' && payload !== 'offline') return 'neither online nor offline';
-    // A retained message may be old, so it doesn't make a known Node seen now.
+    // Only a live `online` is the Node itself: `offline` is usually its last
+    // will, published by the Broker after the Node went quiet, and a retained
+    // message may be old. A Node first met that way can only be dated now.
+    const seen = payload === 'online' && !retained;
     const at = this.now();
     this.db
       .prepare(
@@ -114,7 +117,7 @@ export class NodeRegistry {
          ON CONFLICT (node_id) DO UPDATE SET availability = excluded.availability,
            last_seen = CASE WHEN ? THEN last_seen ELSE excluded.last_seen END`,
       )
-      .run(nodeId, at, at, payload, retained ? 1 : 0);
+      .run(nodeId, at, at, payload, seen ? 0 : 1);
     this.changed(nodeId);
     return undefined;
   }
@@ -128,8 +131,11 @@ export class NodeRegistry {
     this.db.transaction(() => {
       this.db
         .prepare(
-          `INSERT INTO nodes (node_id, first_seen, last_seen, status) VALUES (?, ?, ?, ?)
-           ON CONFLICT (node_id) DO UPDATE SET last_seen = excluded.last_seen, status = excluded.status`,
+          // A Node publishes Status only while connected, so it is online
+          // (a forgotten Node lost its retained `online`).
+          `INSERT INTO nodes (node_id, first_seen, last_seen, availability, status) VALUES (?, ?, ?, 'online', ?)
+           ON CONFLICT (node_id) DO UPDATE SET last_seen = excluded.last_seen, availability = 'online',
+             status = excluded.status`,
         )
         .run(nodeId, at, at, json);
       this.db.prepare('INSERT INTO status_history (node_id, received_at, status) VALUES (?, ?, ?)').run(nodeId, at, json);
