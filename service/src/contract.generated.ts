@@ -34,7 +34,7 @@ export interface Status {
   node_id: string;
   /** The friendly name. Left out when none is set. */
   name?: string;
-  /** Firmware version, as in VERSION. */
+  /** Firmware version, as in VERSION: SemVer 2.0.0 without build metadata (0.3.0-dev, 0.3.0-rc.1, 0.3.0), compared by SemVer precedence. Firmware built before #42 appended +0. */
   fw_version: string;
   /** The Zephyr board target the image was built for, e.g. esp32c6_devkitc/esp32c6/hpcore. Left out by older firmware. */
   board?: string;
@@ -66,7 +66,7 @@ export const statusSchema = {
       "type": "string"
     },
     "fw_version": {
-      "description": "Firmware version, as in VERSION.",
+      "description": "Firmware version, as in VERSION: SemVer 2.0.0 without build metadata (0.3.0-dev, 0.3.0-rc.1, 0.3.0), compared by SemVer precedence. Firmware built before #42 appended +0.",
       "type": "string"
     },
     "board": {

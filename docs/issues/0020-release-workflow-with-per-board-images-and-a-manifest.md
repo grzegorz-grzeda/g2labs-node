@@ -22,7 +22,7 @@ The Hub's Follow Releases Update Policy (#17) needs releases it can use: pushing
 - [ ] The release gets `manifest.json`: version plus, per board target, the asset name and its SHA-256
 - [ ] The manifest has a JSON Schema in `contract/`
 - [ ] The tag must match `VERSION`, or the workflow fails
-- [ ] Release Candidates (e.g. `v0.3.0-rc.1`), built with `EXTRAVERSION = rc.N` so their images report `X.Y.Z-rc.N` (`docs/agents/development-flow.md`, Versioning) produce GitHub pre-releases
+- [ ] Release Candidates (e.g. `v0.3.0-rc.1`), built with `EXTRAVERSION = rc.N` in the build's copy of `VERSION` (never committed; `check_version.py` allows only `dev` or empty there) so their images report `X.Y.Z-rc.N` (`docs/agents/development-flow.md`, Versioning) produce GitHub pre-releases
 - [ ] The tag created on a release PR merge must also trigger the Hub image publish (#22); a tag pushed with the default `GITHUB_TOKEN` triggers no workflows, so publish from the same run or use a token that does
 
 ## Comments

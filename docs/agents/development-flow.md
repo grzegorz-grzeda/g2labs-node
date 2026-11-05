@@ -71,8 +71,8 @@ The hardware smoke test (#16) needs real boards and is not a merge check; it gat
 
   The pre-release identifier is `rc.N`, with a dot, so that `rc.10` sorts after `rc.9`. `VERSION_TWEAK` stays 0: it only reaches MCUboot's image header, never the version.
 - Versions are compared by SemVer 2.0.0 precedence, never as strings: `0.3.0-dev` < `0.3.0-rc.1` < `0.3.0-rc.2` < `0.3.0` < `0.4.0-dev`. That's what "newer" means wherever the Hub decides about an update (#28, #29).
-- A Node reports its version as `fw_version` in its Status (`APP_VERSION_STRING`); for a Release Candidate or a Release that is exactly its tag without the `v`. A Release Candidate's images are built with `EXTRAVERSION = rc.N` (#20), so they report `X.Y.Z-rc.N`.
-- CI checks the rule with `.github/scripts/check_version.py`: `VERSION`, the branch of a release PR, and every `v*` tag.
+- A Node reports its version as `fw_version` in its Status (`APP_VERSION_STRING`); for a Release Candidate or a Release that is exactly its tag without the `v`. A Release Candidate's images are built with `EXTRAVERSION = rc.N` set in the build's own copy of `VERSION`, never committed (#20), so they report `X.Y.Z-rc.N`.
+- CI checks the rule with `.github/scripts/check_version.py`: the committed `VERSION`, the branch of a release PR, and every tag (a tag that isn't `v` + an allowed version fails).
 - A release PR sets `VERSION` to the release (no `-dev`). The first PR after the Release bumps to the next `-dev`.
 - One version and one tag ship both the Node firmware and the Hub image.
 
