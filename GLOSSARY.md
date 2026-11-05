@@ -12,6 +12,10 @@ _Avoid_: Device, board, gateway
 A Node's unique, unchanging identifier: its Wi-Fi MAC address as 12 lowercase hex digits. Used as the MQTT client ID and in the Node's topics. A Node can also have a friendly name, which is only a label.
 _Avoid_: Device ID, serial, hostname
 
+**mDNS name**:
+The name a Node answers to on its local network, `g2labs-<node-id>.local`, so the Hub reaches it without knowing its IP address. Derived from the Node ID and just as unchanging.
+_Avoid_: Hostname, DNS name
+
 **Broker**:
 The self-hosted MQTT server that Nodes publish to and receive commands from.
 _Avoid_: Cloud, server, backend

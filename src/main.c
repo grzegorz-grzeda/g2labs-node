@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: MIT */
+#include <string.h>
+
 #include <zephyr/app_version.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -93,6 +95,18 @@ int main(void)
 	app_core_unlock();
 
 	LOG_INF("g2labs-node %s started, Node ID %s", info.fw_version, node_core_id(&core));
+
+	/* Zephyr takes the hostname's postfix from the first interface to set a
+	 * link address; a second interface could make it another MAC's.
+	 */
+	char mdns_name[WIFI_ADAPTER_MDNS_NAME_SIZE] = "";
+
+	if (wifi_adapter_mdns_name(mdns_name, sizeof(mdns_name)) != 0 ||
+	    strstr(mdns_name, node_core_id(&core)) == NULL) {
+		LOG_ERR("mDNS name %s doesn't carry the Node ID", mdns_name);
+	} else {
+		LOG_INF("mDNS name %s", mdns_name);
+	}
 
 	while (true) {
 		bool have_event = k_msgq_get(&event_queue, &event, TICK_PERIOD) == 0;

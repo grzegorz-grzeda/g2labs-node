@@ -11,6 +11,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/dhcpv4.h>
+#include <zephyr/net/hostname.h>
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/wifi_mgmt.h>
@@ -276,6 +277,13 @@ int wifi_adapter_mac(uint8_t mac[NODE_MAC_LEN])
 	}
 	memcpy(mac, addr->addr, NODE_MAC_LEN);
 	return 0;
+}
+
+int wifi_adapter_mdns_name(char *name, size_t len)
+{
+	int n = snprintf(name, len, "%s.local", net_hostname_get());
+
+	return n < 0 || (size_t)n >= len ? -ENOMEM : 0;
 }
 
 int wifi_adapter_link_info(int *rssi, char *ip, size_t ip_len)

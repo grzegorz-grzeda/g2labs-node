@@ -17,7 +17,7 @@ The contract only grows (ADR-0005): topics and fields are only ever added, and a
 
 The Node's Wi-Fi MAC address as 12 lowercase hex digits, for example `404cca0ab1f2`. It never changes and needs no configuration. `node id` prints it.
 
-The Node answers mDNS as `g2labs-<node-id>.local`, for example `g2labs-404cca0ab1f2.local`, on whichever Known Network it is on, so the Hub reaches it by name rather than by IP address. Like the Node ID, the name never changes and needs no configuration; `node id` prints it too. It resolves only once the Node has an IP address. The naming rule is part of the contract and only grows like the rest of it (ADR-0005).
+The Node answers mDNS as `g2labs-<node-id>.local`, for example `g2labs-404cca0ab1f2.local`, on whichever Known Network it is on, so the Hub reaches it by name rather than by IP address. Like the Node ID, the name never changes and needs no configuration; `node id` prints it too. It resolves only once the Node has an IP address. After a move to another Known Network the Node doesn't announce its new address, so a resolver that cached the old one keeps it for up to the answer's TTL (10 minutes); asking again after a failed connection gets the new one. The naming rule is part of the contract, and like the rest of it never changes (ADR-0005).
 
 ## Topics
 
