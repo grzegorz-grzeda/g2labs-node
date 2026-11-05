@@ -95,9 +95,24 @@ export function generateContract(contractDir: string): string {
   }
 
   const topics = JSON.parse(readFileSync(join(contractDir, 'topics.json'), 'utf8')) as {
-    topics: { pattern: string; publisher: string; retained: boolean; encoding: string }[];
+    topics: { pattern: string; publisher: string; retained: boolean; encoding: string; values?: string[]; meaning?: string }[];
   };
-  const list = topics.topics.map(({ pattern, publisher, retained, encoding }) => ({ pattern, publisher, retained, encoding }));
+  const list = topics.topics.map(({ pattern, publisher, retained, encoding, values }) => ({
+    pattern,
+    publisher,
+    retained,
+    encoding,
+    ...(values ? { values } : {}),
+  }));
+  // A type for each text topic's values, named for its publisher and its last
+  // topic level: g2labs/<node-id>/availability from a node is NodeAvailability.
+  for (const t of topics.topics) {
+    if (!t.values) continue;
+    const pascal = (w: string) => w.replace(/(^|[-_])(\w)/g, (_m, _sep, c: string) => c.toUpperCase());
+    const name = pascal(t.publisher) + pascal(t.pattern.split('/').at(-1)!);
+    out += comment(`${t.pattern}: ${t.meaning ?? ''}`.trim(), '');
+    out += `export type ${name} = ${t.values.map((v) => JSON.stringify(v)).join(' | ')};\n\n`;
+  }
   out += '/** Every topic of the contract (topics.json). */\n';
   out += `export const topics = ${JSON.stringify(list, null, 2)} as const;\n`;
   return out;

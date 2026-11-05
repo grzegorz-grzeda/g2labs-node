@@ -1,7 +1,7 @@
 // The admin API's response types, shared with the admin page (web/), so
 // types only: nothing here may need Node.js.
 
-import type { Status } from './contract.generated.js';
+import type { NodeAvailability, Status } from './contract.generated.js';
 
 export type { Status };
 
@@ -15,7 +15,7 @@ export interface HubStatus {
 }
 
 /** A Node's last word on its availability topic; null until it says one. */
-export type Availability = 'online' | 'offline' | null;
+export type Availability = NodeAvailability | null;
 
 /** One entry of GET /api/nodes */
 export interface NodeSummary {

@@ -1,7 +1,9 @@
 ---
 number: 39
 title: "Take the Hub's Node topics and availability values from the contract"
-status: open
+status: closed
+closed_reason: completed
+closed: 2026-11-05
 labels: [ready-for-agent]
 assignee: claude
 parent: 17
@@ -22,7 +24,14 @@ Behaviour stays the same.
 
 ## Acceptance criteria
 
-- [ ] The generated contract module carries each text topic's `values` and a type for them
-- [ ] The Hub checks availability against those values
-- [ ] The Hub's subscriptions and topic matching come from the generated topics
-- [ ] The existing Hub tests pass unchanged
+- [x] The generated contract module carries each text topic's `values` and a type for them
+- [x] The Hub checks availability against those values
+- [x] The Hub's subscriptions and topic matching come from the generated topics
+- [x] The existing Hub tests pass unchanged
+
+## Comments
+
+### 2026-11-05 — claude
+
+Done. `gen-contract.ts` now carries each text topic's `values` into the generated topics, with a type per topic (`NodeAvailability`, `HubAvailability`). `nodes.ts` checks availability against those values. It keys the topics it handles by their contract pattern, typed so a pattern that isn't a Node topic of the contract fails the typecheck, and derives its subscriptions and topic matching from them. The Hub tests are unchanged and pass.
+
