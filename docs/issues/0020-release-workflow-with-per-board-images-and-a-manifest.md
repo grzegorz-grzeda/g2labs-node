@@ -4,7 +4,7 @@ title: "Release workflow with per-board images and a manifest"
 status: open
 labels: [ready-for-agent]
 parent: 1
-blocked_by: []
+blocked_by: [38]
 created: 2026-11-04
 ---
 
