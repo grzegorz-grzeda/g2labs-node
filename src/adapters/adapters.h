@@ -54,6 +54,9 @@ int wifi_adapter_rssi(void *ctx, int *rssi);
 int wifi_adapter_ipv4(void *ctx, uint8_t addr[NODE_IPV4_LEN]);
 /* The Wi-Fi MAC address, from which the Node ID is derived. */
 int wifi_adapter_mac(uint8_t mac[NODE_MAC_LEN]);
+/* The mDNS name the Node answers to, "g2labs-<node-id>.local", and its buffer size. */
+#define WIFI_ADAPTER_MDNS_NAME_SIZE (CONFIG_NET_HOSTNAME_MAX_LEN + sizeof(".local"))
+int wifi_adapter_mdns_name(char *name, size_t len);
 /* RSSI and IPv4 address of the current link, for diagnostics. */
 int wifi_adapter_link_info(int *rssi, char *ip, size_t ip_len);
 

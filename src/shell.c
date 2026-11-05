@@ -150,12 +150,16 @@ static int cmd_node_id(const struct shell *sh, size_t argc, char **argv)
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
+	char mdns_name[WIFI_ADAPTER_MDNS_NAME_SIZE];
 	struct node_core *core = app_core_lock();
 	const char *name = node_core_friendly_name(core);
 
 	shell_print(sh, "Node ID: %s", node_core_id(core));
 	shell_print(sh, "Friendly name: %s", name[0] != '\0' ? name : "(none)");
 	app_core_unlock();
+	if (wifi_adapter_mdns_name(mdns_name, sizeof(mdns_name)) == 0) {
+		shell_print(sh, "mDNS name: %s", mdns_name);
+	}
 	return 0;
 }
 
@@ -389,7 +393,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(network_cmds,
 
 SHELL_STATIC_SUBCMD_SET_CREATE(node_cmds,
 	SHELL_CMD_ARG(version, NULL, "Print the firmware version", cmd_node_version, 1, 0),
-	SHELL_CMD_ARG(id, NULL, "Print the Node ID and friendly name", cmd_node_id, 1, 0),
+	SHELL_CMD_ARG(id, NULL, "Print the Node ID, friendly name and mDNS name", cmd_node_id, 1, 0),
 	SHELL_CMD(name, &name_cmds, "Friendly name", NULL),
 	SHELL_CMD(network, &network_cmds, "Known Networks", NULL),
 	SHELL_CMD(broker, &broker_cmds, "Broker connection", NULL),

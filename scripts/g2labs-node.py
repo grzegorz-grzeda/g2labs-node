@@ -359,7 +359,7 @@ def parser():
     cmd(sub, "show", do_show, "Show firmware version, Node ID, Known Networks, Broker and images")
 
     cmd(sub, "version", lambda a: run_and_print(a, "version"), "Print the firmware version")
-    cmd(sub, "id", lambda a: run_and_print(a, "id"), "Print the Node ID and friendly name")
+    cmd(sub, "id", lambda a: run_and_print(a, "id"), "Print the Node ID, friendly name and mDNS name")
 
     name = group("name", "Friendly name")
     c = cmd(name, "set", lambda a: run_and_print(a, "name", "set", a.name), "Set the friendly name")
