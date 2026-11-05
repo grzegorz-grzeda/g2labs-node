@@ -55,7 +55,7 @@ Published right after `online`, then every 60 s while connected.
 |---|---|---|
 | `node_id` | string | The Node ID. |
 | `name` | string | The friendly name (`node name set`). Left out when none is set. |
-| `fw_version` | string | Firmware version, as in `VERSION`. |
+| `fw_version` | string | Firmware version, as in `VERSION`: a SemVer 2.0.0 version without build metadata (`0.3.0-dev`, `0.3.0-rc.1`, `0.3.0`), compared by SemVer precedence (`docs/agents/development-flow.md`, Versioning). Firmware before 0.1.0 appended `+0`. |
 | `board` | string | The Zephyr board target the image was built for (`esp32c6_devkitc/esp32c6/hpcore` or `esp32s3_devkitc/esp32s3/procpu`), so the Hub knows which image fits. Left out by older firmware. |
 | `uptime_s` | integer | Seconds since boot. |
 | `network` | string | SSID of the current Known Network. |

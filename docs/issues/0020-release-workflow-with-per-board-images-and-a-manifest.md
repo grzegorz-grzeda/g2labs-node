@@ -16,13 +16,13 @@ The Hub's Follow Releases Update Policy (#17) needs releases it can use: pushing
 
 ## Acceptance criteria
 
-- [ ] A Release Candidate is published when a `v*-rcN` tag is pushed; a stable Release is published when a release PR (`release/vX.Y.Z`, setting `VERSION` without `-dev`) is merged into `main`, the workflow creating the tag itself (see `docs/agents/development-flow.md`)
+- [ ] A Release Candidate is published when a `v*-rc.N` tag is pushed; a stable Release is published when a release PR (`release/vX.Y.Z`, setting `VERSION` without `-dev`) is merged into `main`, the workflow creating the tag itself (see `docs/agents/development-flow.md`)
 - [ ] Both build both boards through sysbuild, as CI does
 - [ ] The release gets `g2labs-node-<version>-<board>.signed.bin` per board (board target with `/` replaced by `-`), the MCUboot-signed Node image suitable for SMP upload
 - [ ] The release gets `manifest.json`: version plus, per board target, the asset name and its SHA-256
 - [ ] The manifest has a JSON Schema in `contract/`
 - [ ] The tag must match `VERSION`, or the workflow fails
-- [ ] Release Candidates (e.g. `v0.3.0-rc1`) produce GitHub pre-releases
+- [ ] Release Candidates (e.g. `v0.3.0-rc.1`), built with `EXTRAVERSION = rc.N` so their images report `X.Y.Z-rc.N` (`docs/agents/development-flow.md`, Versioning) produce GitHub pre-releases
 - [ ] The tag created on a release PR merge must also trigger the Hub image publish (#22); a tag pushed with the default `GITHUB_TOKEN` triggers no workflows, so publish from the same run or use a token that does
 
 ## Comments
