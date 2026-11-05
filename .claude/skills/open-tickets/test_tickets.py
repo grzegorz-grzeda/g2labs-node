@@ -21,7 +21,8 @@ class Fixture(unittest.TestCase):
         self.tmp.cleanup()
 
     def write(self, number, text):
-        (self.dir / f"{number:04d}-ticket-{number}.md").write_text(text)
+        prefix = "done-" if "\nstatus: closed\n" in text else ""
+        (self.dir / f"{prefix}{number:04d}-ticket-{number}.md").write_text(text)
 
     def rows(self):
         return {r["number"]: r for r in tickets(load(self.dir))}
@@ -37,6 +38,14 @@ class Tickets(Fixture):
         self.assertEqual(rows[3]["open_blockers"], [2])
         self.assertEqual(rows[4]["open_blockers"], [])
         self.assertEqual(rows[2]["blocks"], [3])
+        self.assertNotIn(1, rows)
+
+    def test_a_done_file_counts_as_closed(self):
+        self.write(1, issue(1, status="closed"))
+        self.assertTrue((self.dir / "done-0001-ticket-1.md").exists())
+        self.write(2, issue(2, blocked_by="[1]"))
+        rows = self.rows()
+        self.assertEqual(rows[2]["open_blockers"], [])
         self.assertNotIn(1, rows)
 
     def test_unknown_blocker_counts_as_open(self):
@@ -75,7 +84,15 @@ class RealIssues(unittest.TestCase):
     def test_every_issue_file_parses(self):
         issues_dir = Path(__file__).resolve().parents[3] / "docs" / "issues"
         files = list(issues_dir.glob("[0-9][0-9][0-9][0-9]-*.md"))
+        files += list(issues_dir.glob("done-[0-9][0-9][0-9][0-9]-*.md"))
         self.assertEqual(len(load(issues_dir)), len(files))
+
+    def test_a_file_is_done_exactly_when_its_issue_is_closed(self):
+        issues_dir = Path(__file__).resolve().parents[3] / "docs" / "issues"
+        for issue in load(issues_dir).values():
+            with self.subTest(issue["file"]):
+                self.assertEqual(issue["file"].startswith("done-"), issue["status"] == "closed")
+                self.assertTrue(issue["file"].removeprefix("done-").startswith(f"{issue['number']:04d}-"))
 
 
 if __name__ == "__main__":

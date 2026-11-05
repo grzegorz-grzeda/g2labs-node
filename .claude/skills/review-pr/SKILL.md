@@ -27,7 +27,7 @@ Work in that worktree: the fixed point is `origin/main` and HEAD is the PR head.
 
 ## 2. Find the spec
 
-The PR body names the issue (`Closes #N`). Read `docs/issues/NNNN-*.md` as it is in the PR head, because the PR may close it. If the PR names no issue, that is a Spec finding in itself: the development flow requires one, and the only exceptions are release (`release/vX.Y.Z`) and revert PRs. For those, use the PR body as the spec.
+The PR body names the issue (`Closes #N`). Read `docs/issues/NNNN-*.md` as it is in the PR head, because the PR may close it; a closed issue's file is `docs/issues/done-NNNN-*.md`. If the PR names no issue, that is a Spec finding in itself: the development flow requires one, and the only exceptions are release (`release/vX.Y.Z`) and revert PRs. For those, use the PR body as the spec.
 
 ## 3. Review
 
@@ -40,7 +40,7 @@ Also check the things this repo's flow requires:
 
 - An MQTT change updates `contract/` and `docs/mqtt.md` together.
 - Tests drive the code only through its boundaries.
-- The issue file is closed in the PR (`status: closed`, `closed_reason`, `closed:` and a closing comment) unless the PR says why not.
+- The issue file is closed in the PR (`status: closed`, `closed_reason`, `closed:`, a closing comment, and the file renamed to `done-NNNN-slug.md`) unless the PR says why not.
 - A feature or fix PR doesn't touch `VERSION`.
 
 Don't comment on anything CI already checks (builds, tests, the contract checker); it runs separately.

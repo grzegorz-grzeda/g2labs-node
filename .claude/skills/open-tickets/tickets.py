@@ -55,7 +55,10 @@ def summary(body):
 
 def load(issues_dir):
     issues = {}
-    for path in sorted(Path(issues_dir).glob("[0-9][0-9][0-9][0-9]-*.md")):
+    # Closed issues are renamed done-NNNN-slug.md (docs/agents/issue-tracker.md).
+    paths = [*Path(issues_dir).glob("[0-9][0-9][0-9][0-9]-*.md"),
+             *Path(issues_dir).glob("done-[0-9][0-9][0-9][0-9]-*.md")]
+    for path in sorted(paths, key=lambda p: p.name.removeprefix("done-")):
         issue = parse_issue(path.read_text())
         if issue and isinstance(issue.get("number"), int):
             issue["file"] = path.name
