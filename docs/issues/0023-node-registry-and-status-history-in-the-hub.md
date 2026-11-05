@@ -3,6 +3,7 @@ number: 23
 title: "Node registry and Status history in the Hub"
 status: open
 labels: [ready-for-agent]
+assignee: claude
 parent: 17
 blocked_by: [22, 21]
 created: 2026-11-04
