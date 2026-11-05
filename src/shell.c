@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <zephyr/net/hostname.h>
 #include <zephyr/net/net_ip.h>
 
 #include <zephyr/shell/shell.h>
@@ -156,6 +157,7 @@ static int cmd_node_id(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "Node ID: %s", node_core_id(core));
 	shell_print(sh, "Friendly name: %s", name[0] != '\0' ? name : "(none)");
 	app_core_unlock();
+	shell_print(sh, "mDNS name: %s.local", net_hostname_get());
 	return 0;
 }
 
@@ -389,7 +391,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(network_cmds,
 
 SHELL_STATIC_SUBCMD_SET_CREATE(node_cmds,
 	SHELL_CMD_ARG(version, NULL, "Print the firmware version", cmd_node_version, 1, 0),
-	SHELL_CMD_ARG(id, NULL, "Print the Node ID and friendly name", cmd_node_id, 1, 0),
+	SHELL_CMD_ARG(id, NULL, "Print the Node ID, friendly name and mDNS name", cmd_node_id, 1, 0),
 	SHELL_CMD(name, &name_cmds, "Friendly name", NULL),
 	SHELL_CMD(network, &network_cmds, "Known Networks", NULL),
 	SHELL_CMD(broker, &broker_cmds, "Broker connection", NULL),

@@ -15,7 +15,7 @@ The Node's IP address is in `node network status` on the UART shell (or `scripts
 
 ## Host tools
 
-[`smpmgr`](https://github.com/intercreate/smpmgr) (Python, `pip install smpmgr`) does images, OS and the shell. This repo adds a settings group to it as a plugin, `scripts/smpmgr/settings_group.py`, loaded with `--plugin-path=scripts/smpmgr` (it needs `=`). Every command takes `--ip <node-ip>`.
+[`smpmgr`](https://github.com/intercreate/smpmgr) (Python, `pip install smpmgr`) does images, OS and the shell. This repo adds a settings group to it as a plugin, `scripts/smpmgr/settings_group.py`, loaded with `--plugin-path=scripts/smpmgr` (it needs `=`). Every command takes `--ip <node-ip>`. The Node's address is in `node network status`, its Status (`ip`), or its mDNS name: `avahi-resolve -n g2labs-<node-id>.local` (see [`mqtt.md`](mqtt.md#node-id)).
 
 The Go [`mcumgr`](https://github.com/apache/mynewt-mcumgr-cli) CLI also works for images, reset and the shell, with `--conntype udp --connstring "[<node-ip>]:1337"`. It has no settings commands.
 
