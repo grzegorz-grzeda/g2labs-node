@@ -26,6 +26,8 @@ const MATCHERS = HANDLED.map((pattern) => ({
 
 const AVAILABILITY_VALUES: readonly string[] = topics.find((t) => t.pattern === 'g2labs/<node-id>/availability')!.values;
 
+const ONLINE: NodeAvailability = 'online';
+
 function isAvailability(payload: string): payload is NodeAvailability {
   return AVAILABILITY_VALUES.includes(payload);
 }
@@ -136,7 +138,7 @@ export class NodeRegistry {
     // Only a live `online` is the Node itself: `offline` is usually its last
     // will, published by the Broker after the Node went quiet, and a retained
     // message may be old. A Node first met that way can only be dated now.
-    const seen = payload === 'online' && !retained;
+    const seen = payload === ONLINE && !retained;
     const at = this.now();
     this.db
       .prepare(
@@ -160,11 +162,11 @@ export class NodeRegistry {
         .prepare(
           // A Node publishes Status only while connected, so it is online
           // (a forgotten Node lost its retained `online`).
-          `INSERT INTO nodes (node_id, first_seen, last_seen, availability, status) VALUES (?, ?, ?, 'online', ?)
-           ON CONFLICT (node_id) DO UPDATE SET last_seen = excluded.last_seen, availability = 'online',
+          `INSERT INTO nodes (node_id, first_seen, last_seen, availability, status) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT (node_id) DO UPDATE SET last_seen = excluded.last_seen, availability = excluded.availability,
              status = excluded.status`,
         )
-        .run(nodeId, at, at, json);
+        .run(nodeId, at, at, ONLINE, json);
       this.db.prepare('INSERT INTO status_history (node_id, received_at, status) VALUES (?, ?, ?)').run(nodeId, at, json);
       this.prune();
     })();

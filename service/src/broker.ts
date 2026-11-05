@@ -4,8 +4,13 @@
 
 import mqtt, { type MqttClient } from 'mqtt';
 import type { Config } from './config.js';
+import type { HubAvailability, topics } from './contract.generated.js';
 
-export const HUB_AVAILABILITY_TOPIC = 'g2labs/hub/availability';
+type HubTopic = Extract<(typeof topics)[number], { publisher: 'hub' }>['pattern'];
+
+export const HUB_AVAILABILITY_TOPIC = 'g2labs/hub/availability' satisfies HubTopic;
+const ONLINE: HubAvailability = 'online';
+const OFFLINE: HubAvailability = 'offline';
 export const HUB_CLIENT_ID = 'g2labs-hub';
 
 export interface BrokerConnection {
@@ -34,12 +39,12 @@ export function connectBroker(config: Config, log: (msg: string) => void, subscr
     keepalive: 60,
     reconnectPeriod: config.mqttReconnectMs,
     connectTimeout: 30_000,
-    will: { topic: HUB_AVAILABILITY_TOPIC, payload: Buffer.from('offline'), qos: 1, retain: true },
+    will: { topic: HUB_AVAILABILITY_TOPIC, payload: Buffer.from(OFFLINE), qos: 1, retain: true },
   });
 
   client.on('connect', () => {
     log(`connected to the Broker at ${redact(config.mqttUrl)}`);
-    client.publish(HUB_AVAILABILITY_TOPIC, 'online', { qos: 1, retain: true });
+    client.publish(HUB_AVAILABILITY_TOPIC, ONLINE, { qos: 1, retain: true });
     // A clean session forgets subscriptions, so subscribe on every connect.
     client.subscribe(subscription.topics, { qos: 1 }, (err) => {
       if (err) log(`subscribing failed: ${err.message}`);
@@ -67,7 +72,7 @@ export function connectBroker(config: Config, log: (msg: string) => void, subscr
     async close() {
       // A clean disconnect doesn't fire the last will, so say `offline` first.
       if (client.connected) {
-        await client.publishAsync(HUB_AVAILABILITY_TOPIC, 'offline', { qos: 1, retain: true });
+        await client.publishAsync(HUB_AVAILABILITY_TOPIC, OFFLINE, { qos: 1, retain: true });
       }
       await client.endAsync();
     },
