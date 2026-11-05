@@ -40,7 +40,7 @@ Also check the things this repo's flow requires:
 
 - An MQTT change updates `contract/` and `docs/mqtt.md` together.
 - Tests drive the code only through its boundaries.
-- The issue file is closed in the PR (`status: closed`, `closed_reason`, `closed:` and a closing comment) unless the PR says why not.
+- The issue file is closed in the PR (`status: closed`, `closed_reason`, `closed:`, a closing comment, and the file renamed to `done-NNNN-slug.md`) unless the PR says why not. CI doesn't run the `open-tickets` test that checks the prefix.
 - A feature or fix PR doesn't touch `VERSION`.
 
 Don't comment on anything CI already checks (builds, tests, the contract checker); it runs separately.

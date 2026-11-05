@@ -41,7 +41,8 @@ class Tickets(Fixture):
         self.assertNotIn(1, rows)
 
     def test_a_done_file_counts_as_closed(self):
-        (self.dir / "done-0001-ticket-1.md").write_text(issue(1, status="closed"))
+        self.write(1, issue(1, status="closed"))
+        self.assertTrue((self.dir / "done-0001-ticket-1.md").exists())
         self.write(2, issue(2, blocked_by="[1]"))
         rows = self.rows()
         self.assertEqual(rows[2]["open_blockers"], [])
