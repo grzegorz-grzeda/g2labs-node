@@ -3,13 +3,32 @@
 
 import type { Db } from './db.js';
 import { parseStatus } from './contract.js';
-import type { Status } from './contract.generated.js';
+import type { NodeAvailability, Status } from './contract.generated.js';
 import { statusSchema, topics } from './contract.generated.js';
 import type { Availability, NodeDetail, NodeSummary } from './api.js';
 
 const NODE_ID = new RegExp(statusSchema.properties.node_id.pattern);
 
-export const NODE_TOPICS = ['g2labs/+/availability', 'g2labs/+/status'];
+type NodeTopic = Extract<(typeof topics)[number], { publisher: 'node' }>;
+
+/** The Node topics the Hub handles, by their contract pattern. */
+const HANDLED = ['g2labs/<node-id>/availability', 'g2labs/<node-id>/status'] as const satisfies readonly NodeTopic['pattern'][];
+type Handled = (typeof HANDLED)[number];
+
+/** The MQTT subscriptions for the handled topics. */
+export const NODE_TOPICS = HANDLED.map((pattern) => pattern.replace('<node-id>', '+'));
+
+/** Matches a topic against one handled pattern, capturing the Node ID level. */
+const MATCHERS = HANDLED.map((pattern) => ({
+  pattern,
+  regex: new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace('<node-id>', '([^/]+)')}$`),
+}));
+
+const AVAILABILITY_VALUES: readonly string[] = topics.find((t) => t.pattern === 'g2labs/<node-id>/availability')!.values;
+
+function isAvailability(payload: string): payload is NodeAvailability {
+  return AVAILABILITY_VALUES.includes(payload);
+}
 
 interface NodeRow {
   node_id: string;
@@ -85,14 +104,22 @@ export class NodeRegistry {
 
   /** Takes in one message from a topic in NODE_TOPICS. */
   handleMessage(topic: string, payload: Buffer, retained: boolean): void {
-    const match = /^g2labs\/([^/]+)\/(availability|status)$/.exec(topic);
-    if (!match) return;
-    const [, nodeId, kind] = match;
+    let pattern: Handled | undefined;
+    let nodeId = '';
+    for (const m of MATCHERS) {
+      const match = m.regex.exec(topic);
+      if (match) {
+        pattern = m.pattern;
+        nodeId = match[1];
+        break;
+      }
+    }
+    if (pattern === undefined) return;
     if (nodeId === 'hub') return; // the Hub's own availability
     const text = payload.toString();
     const error = !NODE_ID.test(nodeId)
       ? 'not a Node ID'
-      : kind === 'status'
+      : pattern === 'g2labs/<node-id>/status'
         ? this.handleStatus(nodeId, text)
         : this.handleAvailability(nodeId, text, retained);
     if (error !== undefined) {
@@ -105,7 +132,7 @@ export class NodeRegistry {
   private handleAvailability(nodeId: string, payload: string, retained: boolean): string | undefined {
     // Empty is the Broker clearing a retained message, as Forget does.
     if (payload === '') return undefined;
-    if (payload !== 'online' && payload !== 'offline') return 'neither online nor offline';
+    if (!isAvailability(payload)) return `not one of ${AVAILABILITY_VALUES.join(', ')}`;
     // Only a live `online` is the Node itself: `offline` is usually its last
     // will, published by the Broker after the Node went quiet, and a retained
     // message may be old. A Node first met that way can only be dated now.

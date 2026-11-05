@@ -116,13 +116,23 @@ export const statusSchema = {
   "additionalProperties": false
 } as const;
 
+/** g2labs/<node-id>/availability: Whether the Node is connected to the Broker; offline is also its last will. */
+export type NodeAvailability = "online" | "offline";
+
+/** g2labs/hub/availability: Whether the Hub is connected to the Broker; offline is also its last will. */
+export type HubAvailability = "online" | "offline";
+
 /** Every topic of the contract (topics.json). */
 export const topics = [
   {
     "pattern": "g2labs/<node-id>/availability",
     "publisher": "node",
     "retained": true,
-    "encoding": "text"
+    "encoding": "text",
+    "values": [
+      "online",
+      "offline"
+    ]
   },
   {
     "pattern": "g2labs/<node-id>/status",
@@ -140,6 +150,10 @@ export const topics = [
     "pattern": "g2labs/hub/availability",
     "publisher": "hub",
     "retained": true,
-    "encoding": "text"
+    "encoding": "text",
+    "values": [
+      "online",
+      "offline"
+    ]
   }
 ] as const;
