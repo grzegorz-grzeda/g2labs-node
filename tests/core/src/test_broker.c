@@ -107,7 +107,7 @@ ZTEST(broker, test_on_connect_the_node_publishes_its_status)
 {
 	fake.rssi = -61;
 	fake.free_memory = 54321;
-	memcpy(fake.ipv4, (uint8_t[]){192, 168, 1, 42}, 4);
+	memcpy(fake.ipv4, (uint8_t[NODE_IPV4_LEN]){192, 168, 1, 42}, NODE_IPV4_LEN);
 	advance(83500);
 
 	connect_to_broker();
@@ -352,7 +352,7 @@ ZTEST(broker, test_status_is_published_with_every_string_at_its_longest)
 	name[sizeof(name) - 1] = '\0';
 	memset(ssid, '\x01', sizeof(ssid) - 1);
 	ssid[sizeof(ssid) - 1] = '\0';
-	memcpy(fake.ipv4, (uint8_t[]){255, 255, 255, 255}, 4);
+	memcpy(fake.ipv4, (uint8_t[NODE_IPV4_LEN]){255, 255, 255, 255}, NODE_IPV4_LEN);
 	fake.rssi = -128;
 	fake.free_memory = SIZE_MAX;
 	zassert_ok(node_core_set_friendly_name(&core, name));
@@ -369,8 +369,12 @@ ZTEST(broker, test_status_is_published_with_every_string_at_its_longest)
 
 	zassert_equal(fake.publish_count, 2);
 	zassert_str_equal(fake.publishes[1].topic, "g2labs/404cca0ab1f2/status");
-	zassert_not_null(strstr(fake.publishes[1].payload, "\"free_heap\":"), "%s",
+	zassert_not_null(strstr(fake.publishes[1].payload, "\"ip\":\"255.255.255.255\","), "%s",
 			 fake.publishes[1].payload);
+	zassert_not_null(strstr(fake.publishes[1].payload, "\"rssi\":-128,"), "%s",
+			 fake.publishes[1].payload);
+	zassert_equal(fake.publishes[1].payload[fake.publishes[1].len - 1], '}', "%s",
+		      fake.publishes[1].payload);
 }
 
 ZTEST(broker, test_a_new_node_has_no_broker_on_the_default_port)

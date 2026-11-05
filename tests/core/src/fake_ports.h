@@ -14,6 +14,7 @@
 
 #define FAKE_MAX_PUBLISHES 32
 #define FAKE_TOPIC_MAX     128
+/* At least the core's STATUS_MAX, so a whole Status is recorded. */
 #define FAKE_PAYLOAD_MAX   768
 
 struct fake_publish {
@@ -64,7 +65,7 @@ struct fake_ports {
 	 */
 	int rssi;
 	int rssi_result;
-	uint8_t ipv4[4];
+	uint8_t ipv4[NODE_IPV4_LEN];
 	int ipv4_result;
 	size_t free_memory;
 

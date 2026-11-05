@@ -251,7 +251,7 @@ int wifi_adapter_rssi(void *ctx, int *rssi)
 	return 0;
 }
 
-int wifi_adapter_ipv4(void *ctx, uint8_t addr[4])
+int wifi_adapter_ipv4(void *ctx, uint8_t addr[NODE_IPV4_LEN])
 {
 	ARG_UNUSED(ctx);
 
@@ -292,9 +292,10 @@ int wifi_adapter_link_info(int *rssi, char *ip, size_t ip_len)
 		return err;
 	}
 
-	struct net_in_addr *addr = net_if_ipv4_get_global_addr(iface, NET_ADDR_PREFERRED);
+	uint8_t addr[NODE_IPV4_LEN];
 
-	if (addr == NULL || net_addr_ntop(NET_AF_INET, addr, ip, ip_len) == NULL) {
+	if (wifi_adapter_ipv4(NULL, addr) != 0 ||
+	    net_addr_ntop(NET_AF_INET, addr, ip, ip_len) == NULL) {
 		snprintf(ip, ip_len, "none");
 	}
 	return 0;

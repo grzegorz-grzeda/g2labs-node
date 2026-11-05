@@ -165,7 +165,7 @@ static int fake_wifi_rssi(void *ctx, int *rssi)
 	return fake->rssi_result;
 }
 
-static int fake_wifi_ipv4(void *ctx, uint8_t addr[4])
+static int fake_wifi_ipv4(void *ctx, uint8_t addr[NODE_IPV4_LEN])
 {
 	struct fake_ports *fake = ctx;
 

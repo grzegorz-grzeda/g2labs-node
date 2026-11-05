@@ -20,6 +20,9 @@
 extern "C" {
 #endif
 
+/* An IPv4 address, most significant byte first. */
+#define NODE_IPV4_LEN 4
+
 /* How to reach the Broker, for the mqtt_connect port. */
 struct node_mqtt_connect {
 	const char *host;
@@ -70,8 +73,8 @@ struct node_ports {
 	/* Wi-Fi adapter: the RSSI of the current link, in dBm. */
 	int (*wifi_rssi)(void *ctx, int *rssi);
 
-	/* Wi-Fi adapter: the Node's IPv4 address, most significant byte first. */
-	int (*wifi_ipv4)(void *ctx, uint8_t addr[4]);
+	/* Wi-Fi adapter: the Node's IPv4 address. */
+	int (*wifi_ipv4)(void *ctx, uint8_t addr[NODE_IPV4_LEN]);
 
 	/* Free heap memory, in bytes. */
 	size_t (*free_memory)(void *ctx);
@@ -208,7 +211,11 @@ struct node_event {
 /* Facts about this Node fixed at build or boot time. */
 struct node_info {
 	const char *fw_version;
-	/* The Zephyr board target the image was built for. */
+	/*
+	 * The Zephyr board target the image was built for, as the Hub names
+	 * images (e.g. "esp32c6_devkitc/esp32c6/hpcore"). Required, like
+	 * fw_version.
+	 */
 	const char *board;
 	/* The Wi-Fi MAC address, from which the Node ID is derived. */
 	uint8_t mac[NODE_MAC_LEN];

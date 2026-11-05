@@ -99,7 +99,7 @@ static void publish_status(struct node_core *core)
 {
 	char payload[STATUS_MAX];
 	struct json_writer w = {.buf = payload, .size = sizeof(payload)};
-	uint8_t ipv4[4];
+	uint8_t ipv4[NODE_IPV4_LEN];
 	char ip[sizeof("255.255.255.255")];
 	int rssi;
 
