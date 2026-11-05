@@ -165,6 +165,14 @@ static int fake_wifi_rssi(void *ctx, int *rssi)
 	return fake->rssi_result;
 }
 
+static int fake_wifi_ipv4(void *ctx, uint8_t addr[4])
+{
+	struct fake_ports *fake = ctx;
+
+	memcpy(addr, fake->ipv4, sizeof(fake->ipv4));
+	return fake->ipv4_result;
+}
+
 static size_t fake_free_memory(void *ctx)
 {
 	struct fake_ports *fake = ctx;
@@ -216,6 +224,7 @@ void fake_ports_init(struct fake_ports *fake)
 		.mqtt_publish = fake_mqtt_publish,
 		.mqtt_subscribe_commands = fake_mqtt_subscribe,
 		.wifi_rssi = fake_wifi_rssi,
+		.wifi_ipv4 = fake_wifi_ipv4,
 		.free_memory = fake_free_memory,
 		.wifi_scan = fake_wifi_scan,
 		.wifi_connect = fake_wifi_connect,

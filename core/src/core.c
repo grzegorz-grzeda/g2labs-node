@@ -93,12 +93,14 @@ static void broker_disconnect(struct node_core *core, bool retry)
 }
 
 /* Room for the status JSON with every string at its longest, fully escaped. */
-#define STATUS_MAX 512
+#define STATUS_MAX 768
 
 static void publish_status(struct node_core *core)
 {
 	char payload[STATUS_MAX];
 	struct json_writer w = {.buf = payload, .size = sizeof(payload)};
+	uint8_t ipv4[4];
+	char ip[sizeof("255.255.255.255")];
 	int rssi;
 
 	json_putc(&w, '{');
@@ -110,10 +112,19 @@ static void publish_status(struct node_core *core)
 	}
 	json_key(&w, "fw_version");
 	json_string(&w, core->info.fw_version);
+	json_key(&w, "board");
+	json_string(&w, core->info.board);
 	json_key(&w, "uptime_s");
 	json_unsigned(&w, (unsigned long)(core->now_ms / 1000));
 	json_key(&w, "network");
 	json_string(&w, core->wifi_ssid);
+	json_key(&w, "ip");
+	if (core->ports->wifi_ipv4(core->ports->ctx, ipv4) == 0) {
+		snprintf(ip, sizeof(ip), "%u.%u.%u.%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
+		json_string(&w, ip);
+	} else {
+		json_raw(&w, "null");
+	}
 	json_key(&w, "rssi");
 	if (core->ports->wifi_rssi(core->ports->ctx, &rssi) == 0) {
 		json_int(&w, rssi);

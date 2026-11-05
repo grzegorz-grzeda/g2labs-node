@@ -13,6 +13,7 @@ static struct fake_ports fake;
 static struct node_core core;
 static const struct node_info info = {
 	.fw_version = "1.2.3",
+	.board = "esp32c6_devkitc/esp32c6/hpcore",
 	.mac = {0x40, 0x4c, 0xca, 0x0a, 0xb1, 0xF2},
 };
 static int64_t now_ms;
@@ -106,6 +107,7 @@ ZTEST(broker, test_on_connect_the_node_publishes_its_status)
 {
 	fake.rssi = -61;
 	fake.free_memory = 54321;
+	memcpy(fake.ipv4, (uint8_t[]){192, 168, 1, 42}, 4);
 	advance(83500);
 
 	connect_to_broker();
@@ -114,7 +116,9 @@ ZTEST(broker, test_on_connect_the_node_publishes_its_status)
 	zassert_str_equal(fake.publishes[1].topic, "g2labs/404cca0ab1f2/status");
 	zassert_str_equal(fake.publishes[1].payload,
 			  "{\"node_id\":\"404cca0ab1f2\",\"fw_version\":\"1.2.3\","
-			  "\"uptime_s\":83,\"network\":\"home\",\"rssi\":-61,"
+			  "\"board\":\"esp32c6_devkitc/esp32c6/hpcore\","
+			  "\"uptime_s\":83,\"network\":\"home\",\"ip\":\"192.168.1.42\","
+			  "\"rssi\":-61,"
 			  "\"free_heap\":54321}");
 	zassert_false(fake.publishes[1].retained);
 }
@@ -324,6 +328,48 @@ ZTEST(broker, test_status_reports_a_null_rssi_when_the_link_cannot_tell)
 	connect_to_broker();
 
 	zassert_not_null(strstr(fake.publishes[1].payload, "\"rssi\":null,"), "%s",
+			 fake.publishes[1].payload);
+}
+
+ZTEST(broker, test_status_reports_a_null_ip_when_the_link_cannot_tell)
+{
+	fake.ipv4_result = -ENOENT;
+
+	connect_to_broker();
+
+	zassert_not_null(strstr(fake.publishes[1].payload, "\"ip\":null,"), "%s",
+			 fake.publishes[1].payload);
+}
+
+ZTEST(broker, test_status_is_published_with_every_string_at_its_longest)
+{
+	/* Control characters escape to six bytes each: \u0001. */
+	char name[NODE_FRIENDLY_NAME_MAX_LEN + 1];
+	char ssid[NODE_SSID_MAX_LEN + 1];
+	struct node_event heard = {.type = NODE_EVENT_WIFI_NETWORK_HEARD};
+
+	memset(name, '\x01', sizeof(name) - 1);
+	name[sizeof(name) - 1] = '\0';
+	memset(ssid, '\x01', sizeof(ssid) - 1);
+	ssid[sizeof(ssid) - 1] = '\0';
+	memcpy(fake.ipv4, (uint8_t[]){255, 255, 255, 255}, 4);
+	fake.rssi = -128;
+	fake.free_memory = SIZE_MAX;
+	zassert_ok(node_core_set_friendly_name(&core, name));
+	zassert_ok(node_core_add_known_network(&core, ssid, "password1"));
+	set_broker("broker.lan", 1883, "node", "secret123");
+	node_core_start(&core);
+	strcpy(heard.network_heard.ssid, ssid);
+	heard.network_heard.rssi = -50;
+	node_core_handle_event(&core, &heard);
+	event(NODE_EVENT_WIFI_SCAN_DONE);
+	event(NODE_EVENT_WIFI_ASSOCIATED);
+	event(NODE_EVENT_WIFI_CONNECTED);
+	event(NODE_EVENT_BROKER_CONNECTED);
+
+	zassert_equal(fake.publish_count, 2);
+	zassert_str_equal(fake.publishes[1].topic, "g2labs/404cca0ab1f2/status");
+	zassert_not_null(strstr(fake.publishes[1].payload, "\"free_heap\":"), "%s",
 			 fake.publishes[1].payload);
 }
 

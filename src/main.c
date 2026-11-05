@@ -21,6 +21,7 @@ static const struct node_ports ports = {
 	.mqtt_publish = mqtt_adapter_publish,
 	.mqtt_subscribe_commands = mqtt_adapter_subscribe_commands,
 	.wifi_rssi = wifi_adapter_rssi,
+	.wifi_ipv4 = wifi_adapter_ipv4,
 	.free_memory = memory_adapter_free,
 	.wifi_scan = wifi_adapter_scan,
 	.wifi_connect = wifi_adapter_connect,
@@ -69,6 +70,7 @@ int main(void)
 {
 	struct node_info info = {
 		.fw_version = APP_VERSION_EXTENDED_STRING,
+		.board = CONFIG_BOARD_TARGET,
 		.broker_failover_ms = CONFIG_NODE_BROKER_FAILOVER_S * 1000U,
 	};
 	struct node_event event;

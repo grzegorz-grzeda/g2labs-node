@@ -251,6 +251,21 @@ int wifi_adapter_rssi(void *ctx, int *rssi)
 	return 0;
 }
 
+int wifi_adapter_ipv4(void *ctx, uint8_t addr[4])
+{
+	ARG_UNUSED(ctx);
+
+	struct net_if *iface = net_if_get_first_wifi();
+	struct net_in_addr *ipv4 =
+		iface != NULL ? net_if_ipv4_get_global_addr(iface, NET_ADDR_PREFERRED) : NULL;
+
+	if (ipv4 == NULL) {
+		return -ENOENT;
+	}
+	memcpy(addr, ipv4->s4_addr, sizeof(ipv4->s4_addr));
+	return 0;
+}
+
 int wifi_adapter_mac(uint8_t mac[NODE_MAC_LEN])
 {
 	struct net_if *iface = net_if_get_first_wifi();

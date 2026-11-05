@@ -50,6 +50,8 @@ int wifi_adapter_scan(void *ctx);
 int wifi_adapter_connect(void *ctx, const char *ssid, const char *password);
 int wifi_adapter_disconnect(void *ctx);
 int wifi_adapter_rssi(void *ctx, int *rssi);
+/* The global IPv4 address of the Wi-Fi interface; -ENOENT without one. */
+int wifi_adapter_ipv4(void *ctx, uint8_t addr[4]);
 /* The Wi-Fi MAC address, from which the Node ID is derived. */
 int wifi_adapter_mac(uint8_t mac[NODE_MAC_LEN]);
 /* RSSI and IPv4 address of the current link, for diagnostics. */

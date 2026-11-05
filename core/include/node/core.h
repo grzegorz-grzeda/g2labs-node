@@ -70,6 +70,9 @@ struct node_ports {
 	/* Wi-Fi adapter: the RSSI of the current link, in dBm. */
 	int (*wifi_rssi)(void *ctx, int *rssi);
 
+	/* Wi-Fi adapter: the Node's IPv4 address, most significant byte first. */
+	int (*wifi_ipv4)(void *ctx, uint8_t addr[4]);
+
 	/* Free heap memory, in bytes. */
 	size_t (*free_memory)(void *ctx);
 
@@ -205,6 +208,8 @@ struct node_event {
 /* Facts about this Node fixed at build or boot time. */
 struct node_info {
 	const char *fw_version;
+	/* The Zephyr board target the image was built for. */
+	const char *board;
 	/* The Wi-Fi MAC address, from which the Node ID is derived. */
 	uint8_t mac[NODE_MAC_LEN];
 	/*
