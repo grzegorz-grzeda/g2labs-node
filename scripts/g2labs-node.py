@@ -162,8 +162,11 @@ def do_flash(args):
 
 def do_monitor(args):
     print(f"Monitor on {args.port}; quit with Ctrl-]", flush=True)
+    # miniterm's default filter shows escape sequences as symbols (␛[1;32m);
+    # pass them through, so the shell's colours and line editing reach the
+    # terminal as VT100.
     subprocess.call([sys.executable, "-m", "serial.tools.miniterm",
-                     "--quiet", args.port, str(BAUD)])
+                     "--quiet", "--filter", "direct", args.port, str(BAUD)])
 
 
 # --- shell subcommands -------------------------------------------------------
