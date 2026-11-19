@@ -7,13 +7,11 @@ Firmware versions are SemVer 2.0.0 without build metadata
   X.Y.Z-dev     main between Releases (VERSION's EXTRAVERSION = dev)
   X.Y.Z-rc.N    a Release Candidate, tagged vX.Y.Z-rc.N on a main commit
                 whose VERSION is X.Y.Z-dev
-  X.Y.Z         a stable Release: VERSION in its release PR (release/vX.Y.Z)
-                and its tag vX.Y.Z
+  X.Y.Z         a stable Release: VERSION in its release commit, tagged vX.Y.Z
 
   check_version.py [--version-file VERSION] [--ref REF]
 
-REF is a tag (refs/tags/…), a branch (refs/heads/… or a PR's head branch
-name) or empty. Prints what is wrong; exits 0 when nothing is, 1 otherwise.
+REF is a tag (refs/tags/…), a branch or empty; only tags are checked. Prints what is wrong; exits 0 when nothing is, 1 otherwise.
 """
 
 import argparse
@@ -44,7 +42,7 @@ def read_version(text):
         raise ValueError("VERSION_TWEAK must be 0: it is not part of the version")
     if values["EXTRAVERSION"] not in ("", "dev"):
         raise ValueError(
-            f"EXTRAVERSION must be dev (main) or empty (a release PR), not {values['EXTRAVERSION']!r}"
+            f"EXTRAVERSION must be dev (main) or empty (a release commit), not {values['EXTRAVERSION']!r}"
         )
     core = ".".join(values[f] for f in FIELDS[:3])
     version = core + ("-" + values["EXTRAVERSION"] if values["EXTRAVERSION"] else "")
@@ -71,13 +69,6 @@ def check(version, ref):
             return []
         return [f"tag {tag} is neither vX.Y.Z nor vX.Y.Z-rc.N (N from 1)"]
 
-    branch = ref.removeprefix("refs/heads/")
-    if branch.startswith("release/"):
-        named = branch.removeprefix("release/")
-        if not (named.startswith("v") and RELEASE.fullmatch(named[1:])):
-            return [f"release branch {branch} must be release/vX.Y.Z"]
-        if version != named[1:]:
-            return [f"release PR {branch} must set VERSION to {named[1:]}, not {version}"]
     return []
 
 

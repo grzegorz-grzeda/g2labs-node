@@ -1,8 +1,10 @@
 ---
 number: 38
 title: "Let test-only CI changes merge without the maintainer"
-status: open
-labels: [ready-for-agent]
+status: closed
+closed_reason: not_planned
+closed: 2026-11-19
+labels: [wontfix]
 parent:
 blocked_by: []
 created: 2026-11-05
@@ -32,3 +34,9 @@ Out of scope: the contract (`contract/**` stops being gated in #31), ADRs, `sysb
 - [ ] A PR changing `ci.yml` is gated when its `ci.yml` drops the top-level `permissions: contents: read`, grants a non-read permission (including `write-all`) at any level, or uses `secrets.`, `secrets: inherit`, `pull_request_target` or `workflow_run`, and passes otherwise; unit tests cover each case and a failed fetch fails the gate
 - [ ] `development-flow.md` and CLAUDE.md describe the new gate and `release.yml`
 - [ ] This PR itself needs `human-approved` (it changes the gate); the first later PR that only touches `ci.yml` merges without it
+
+## Comments
+
+### 2026-11-19 — claude
+
+Not planned: ADR-0007 removes `human-gate` and PRs altogether, so there is no gate to narrow. Splitting `hub-image` out of `ci.yml` is still possible later, but nothing needs it now.

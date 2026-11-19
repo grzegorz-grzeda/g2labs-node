@@ -1,5 +1,7 @@
 # Merging never delivers; a person approves every stable Release
 
+_How Claude integrates and how the maintainer approves a Release changed in ADR-0007: approval now happens in the conversation, without PRs or a release PR. The decision below still holds._
+
 Claude writes, reviews and merges PRs into `main` on its own once every required check is green, but nothing merged reaches the fleet until it is in a stable Release. Claude tags Release Candidates freely, since Follow Releases skips them. A stable Release is published only when the maintainer merges a release PR, which Claude prepares with a recommendation to release or to wait. Under Follow Releases a stable Release is a Rollout to every Node, so it is the one step where a person's judgement and a hardware smoke test sit between agent-written code and devices.
 
 ## Considered Options

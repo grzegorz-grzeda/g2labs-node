@@ -101,8 +101,8 @@ jobs:
           python contract/check.py --publisher node twister-out
 
       - name: Version
-        # VERSION, the release PR's branch or the v* tag against the
-        # versioning rule (docs/agents/development-flow.md).
+        # VERSION and the v* tag against the versioning rule
+        # (docs/agents/development-flow.md).
         run: python .github/scripts/check_version.py --ref "${GITHUB_HEAD_REF:-$GITHUB_REF}"
 
       - name: Development flow scripts' and project skills' tests

@@ -17,7 +17,7 @@ g2labs-node is a Zephyr RTOS-based IoT node application (MIT licensed), plus the
 - `docs/mqtt.md` — the human explanation of the MQTT contract; update it together with `contract/` for any change to topics or payloads.
 - `tests/core/` — ztest suite driving the core through fake ports (`src/fake_ports.c`) on `native_sim`. Tests assert only on recorded outputs, never on core internals.
 - `service/` — the Hub (package `g2labs-node-service`), TypeScript on Node.js 24 (`service/.nvmrc`), separate from the Zephyr build. `src/hub.ts` wires `db.ts` (SQLite via `better-sqlite3`, WAL mode, append-only migrations in `PRAGMA user_version`), `broker.ts` (MQTT client: retained `g2labs/hub/availability` with an `offline` last will, subscriptions, reconnects), `nodes.ts` (the Node registry and Status history, fed from the Nodes' topics, pruned after `HUB_STATUS_RETENTION_DAYS`, Forget) and `http.ts` (Fastify: the admin page from `dist/public` plus `/api` and its live `/api/events` stream, behind one admin password and an in-memory session cookie); `src/main.ts` runs it from env vars (`src/config.ts`: `HUB_MQTT_URL`, `HUB_MQTT_USERNAME`, `HUB_MQTT_PASSWORD`, `HUB_ADMIN_PASSWORD`, `HUB_DATA_DIR`, `HUB_HTTP_PORT`, `HUB_STATUS_RETENTION_DAYS`, …). `src/contract.generated.ts` (payload types, schemas, topics and the text topics' values) is generated from `contract/` by `npm run contract` and committed, because the Docker build sees only `service/`; a test fails when it is stale. `src/contract.ts` validates incoming payloads with it (Ajv, dropping unknown fields). `src/api.ts` holds the API's response types, shared with `web/`, the React + Vite admin page. `test/` drives the Hub only through MQTT (an in-process aedes Broker) and HTTP, feeding it the payloads in `contract/examples/`. `Dockerfile` builds the amd64/arm64 image; `docker-compose.example.yml` runs it with `network_mode: host` next to Mosquitto.
-- `VERSION` — firmware version (`APP_VERSION_*` in `<zephyr/app_version.h>`, also used to sign the MCUboot image). Versions are SemVer 2.0.0 without build metadata (`X.Y.Z-dev`, `X.Y.Z-rc.N`, `X.Y.Z`); the Node reports `APP_VERSION_STRING`. `.github/scripts/check_version.py` checks the committed `VERSION`, release branches and every tag against the rule in CI (see `docs/agents/development-flow.md`).
+- `VERSION` — firmware version (`APP_VERSION_*` in `<zephyr/app_version.h>`, also used to sign the MCUboot image). Versions are SemVer 2.0.0 without build metadata (`X.Y.Z-dev`, `X.Y.Z-rc.N`, `X.Y.Z`); the Node reports `APP_VERSION_STRING`. `.github/scripts/check_version.py` checks the committed `VERSION` and every tag against the rule in CI (see `docs/agents/development-flow.md`).
 
 ## Workspace layout
 
@@ -100,17 +100,15 @@ docker build -t g2labs-node-service .                # the container image
 
 In `ci.yml`, the `hub` job builds and tests `service/` and builds its image for amd64 and arm64 (under QEMU, loading better-sqlite3 in each). On a `v*` tag, `hub-image` pushes the multi-arch image to `ghcr.io/<owner>/g2labs-node-service` (a Release Candidate `vX.Y.Z-rc.N` as its version only, a stable Release as its version and `latest`).
 
-`.github/workflows/human-gate.yml` sets the `human-gate` status on every PR: it fails while the PR touches a path in `.github/gated-paths` or carries `ready-for-human`, until the maintainer adds `human-approved` (logic and tests in `.github/scripts/`).
-
 ## Agent skills
 
 ### Development flow
 
-Every change goes through a branch (`<kind>/<issue>-<slug>`) and a squash-merged PR that auto-merges once CI, `claude-review` and `human-gate` pass. Merging never delivers: only a stable Release, approved by the maintainer through a release PR, reaches the fleet (ADR-0006). See `docs/agents/development-flow.md`.
+Work happens on a local branch (`<kind>/<issue>-<slug>`). `main` changes only when the maintainer says "ok" in the conversation to a diff Claude showed; Claude then pushes it to `main` as one squash commit, with no PR (ADR-0007). Subagents and side sessions never push `main`: they hand their work back to the session talking to the maintainer. Pushing never delivers: only a stable Release, which the maintainer approves in the conversation after the hardware smoke test, reaches the fleet (ADR-0006). See `docs/agents/development-flow.md`.
 
 ### Review
 
-The `review-pr` project skill (`.claude/skills/review-pr/`) reviews a PR with fresh context and records the `claude-review` check. Invoke it from a fresh subagent or session, never from the session that wrote the PR (see `docs/agents/development-flow.md`).
+The `review-change` project skill (`.claude/skills/review-change/`) reviews a local branch with fresh context and reports back to the caller. Run it from a fresh subagent, never in the session that wrote the change, before showing a code change to the maintainer (see `docs/agents/development-flow.md`).
 
 ### Issue tracker
 

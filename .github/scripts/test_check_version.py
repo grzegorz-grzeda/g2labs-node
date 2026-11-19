@@ -40,22 +40,11 @@ class ReadVersion(unittest.TestCase):
 
 class Refs(unittest.TestCase):
     def test_any_branch_takes_dev_or_a_release(self):
-        # main holds X.Y.Z between a release PR and the next -dev bump.
+        # main holds X.Y.Z between a release commit and the next -dev bump.
         for version in ("0.3.0-dev", "0.3.0"):
-            for ref in ("", "refs/heads/main", "feat/42-semver-2-versions"):
+            for ref in ("", "refs/heads/main", "feat/42-semver-2-versions", "release/v0.4.0"):
                 with self.subTest(version=version, ref=ref):
                     self.assertEqual(check(version, ref), [])
-
-    def test_a_release_pr_sets_its_version(self):
-        self.assertEqual(check("0.3.0", "release/v0.3.0"), [])
-        self.assertEqual(check("0.3.0", "refs/heads/release/v0.3.0"), [])
-        self.assertTrue(check("0.3.0-dev", "release/v0.3.0"))
-        self.assertTrue(check("0.4.0", "release/v0.3.0"))
-
-    def test_a_release_branch_names_a_stable_release(self):
-        for ref in ("release/v0.3", "release/0.3.0", "release/v0.3.0-rc.1"):
-            with self.subTest(ref):
-                self.assertTrue(check("0.3.0", ref))
 
     def test_a_stable_tag_matches_version(self):
         self.assertEqual(check("0.3.0", "refs/tags/v0.3.0"), [])
