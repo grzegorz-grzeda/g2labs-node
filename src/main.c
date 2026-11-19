@@ -71,7 +71,8 @@ void app_post_event(const struct node_event *event)
 int main(void)
 {
 	struct node_info info = {
-		.fw_version = APP_VERSION_EXTENDED_STRING,
+		/* SemVer 2.0.0 without build metadata (VERSION_TWEAK is MCUboot's only). */
+		.fw_version = APP_VERSION_STRING,
 		/* Neither board has a revision, so this is the plain board target. */
 		.board = CONFIG_BOARD_TARGET,
 		.broker_failover_ms = CONFIG_NODE_BROKER_FAILOVER_S * 1000U,
