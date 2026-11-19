@@ -87,9 +87,14 @@ jobs:
           key: zephyr-sdk-${{ env.ZEPHYR_SDK_VERSION }}-riscv64-xtensa-esp32s3
 
       - name: Install Zephyr SDK
+        # Authenticated, so the GitHub API's release lookup isn't limited to
+        # the 60 requests an hour a shared runner IP gets.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           west sdk install --version "$ZEPHYR_SDK_VERSION" \
             -d ~/zephyr-sdk-"$ZEPHYR_SDK_VERSION" --no-hosttools \
+            --personal-access-token "$GH_TOKEN" \
             --gnu-toolchains riscv64-zephyr-elf xtensa-espressif_esp32s3_zephyr-elf
 
       - name: Node core tests (native_sim)
