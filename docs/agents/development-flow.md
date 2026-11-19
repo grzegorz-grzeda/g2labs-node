@@ -22,6 +22,15 @@ Two events, never confused:
 - Up to 3 branches at once, each in its own worktree, and only for issues that don't touch the same area.
 - Every change, including issue, glossary and spec edits, has an issue. Work without one gets an issue first.
 
+## From a design conversation to tickets
+
+When a conversation settles a design (a grilling, `/grill-with-docs`, or any "let's work out how X should be"), the maintainer's confirmation of the shared understanding is not approval to implement. The next step is the tickets:
+
+1. **Spec.** Write the outcome as an issue: what to build and why, what is out of scope, and the decisions taken, each in a line. A design that splits into more than one ticket gets a parent spec issue; a single-ticket design is just that ticket.
+2. **Tickets.** Split the spec into child issues (`parent:` the spec), each small enough for one squash commit, with acceptance criteria, `blocked_by` where order matters, and `ready-for-agent`, or `ready-for-human` for what needs the maintainer or hardware. Follow-ups noticed along the way get their own `needs-triage` issue.
+3. **Approve.** Show the maintainer the spec and the tickets, as text, and wait for their "ok". Their approval pushes the issue files to `main` as one `docs` commit.
+4. **Implement.** Only then pick the tickets up as above, each with its own diff and approval.
+
 ## Branches and commits
 
 Work happens on a short-lived local branch off `main`, one per issue: `<kind>/<issue>-<slug>`.
