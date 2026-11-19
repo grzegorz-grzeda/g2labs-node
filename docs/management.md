@@ -6,7 +6,7 @@ Once a Node has an IP address on a Known Network, it answers SMP (MCUmgr's Simpl
 |---|---|
 | Image | Upload an image to the secondary slot, list both slots, mark an image for test or confirm it |
 | OS | Echo, reset, and the buffer size and bootloader info that host tools size uploads from |
-| Shell | Run any UART shell command (`node …` and the rest) and get its output |
+| Shell | Run any UART shell command (`node …`, including `node status`, and Zephyr's `net` and `kernel` commands) and get its output |
 | Settings | Read and change the Node's settings, without their passwords |
 
 The Node's IP address is in `node network status` on the UART shell (or `scripts/g2labs-node.py show`).

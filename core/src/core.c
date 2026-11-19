@@ -36,6 +36,9 @@ static void start_failover_period(struct node_core *core)
 	uint32_t period = core->info.broker_failover_ms != 0 ? core->info.broker_failover_ms
 							      : NODE_BROKER_FAILOVER_TIMEOUT_MS;
 
+	if (!core->broker_outage) {
+		core->broker_outage_since_ms = core->now_ms;
+	}
 	core->broker_outage = true;
 	core->broker_failover_deadline_ms = core->now_ms + period;
 }
@@ -261,6 +264,7 @@ static void on_broker_connected(struct node_core *core)
 	}
 	core->broker_state = NODE_BROKER_CONNECTED;
 	core->broker_outage = false;
+	core->broker_connected_at_ms = core->now_ms;
 	publish(core, "availability", "online", true);
 	subscribe_commands(core);
 	publish_status(core);
@@ -741,4 +745,33 @@ const struct node_broker *node_core_broker(const struct node_core *core)
 bool node_core_broker_connected(const struct node_core *core)
 {
 	return core->broker_state == NODE_BROKER_CONNECTED;
+}
+
+void node_core_state(const struct node_core *core, struct node_state *state)
+{
+	bool on_network = core->wifi_state != NODE_WIFI_IDLE &&
+			  core->wifi_state != NODE_WIFI_SCANNING;
+	bool unreachable = core->broker_outage &&
+			   (core->broker_state == NODE_BROKER_CONNECTING ||
+			    core->broker_state == NODE_BROKER_RETRY_WAIT);
+
+	*state = (struct node_state){
+		.wifi = core->wifi_state,
+		.ssid = on_network ? core->wifi_ssid : "",
+		.broker = core->broker_state,
+		.failover_in_ms = -1,
+		.image_confirmed = core->image_confirmed,
+		.reboot_pending = core->reboot_pending,
+	};
+	if (core->broker_state == NODE_BROKER_CONNECTED) {
+		state->broker_connected_ms = core->now_ms - core->broker_connected_at_ms;
+	}
+	if (unreachable) {
+		state->broker_unreachable_ms = core->now_ms - core->broker_outage_since_ms;
+		if (core->wifi_state == NODE_WIFI_CONNECTED && core->known_network_count >= 2) {
+			int64_t left = core->broker_failover_deadline_ms - core->now_ms;
+
+			state->failover_in_ms = left > 0 ? left : 0;
+		}
+	}
 }

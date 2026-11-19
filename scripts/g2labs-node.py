@@ -172,6 +172,7 @@ def do_show(args):
     shell = open_shell(args)
     try:
         sections = [
+            ("Status", ("status",)),
             ("Firmware version", ("version",)),
             ("Node", ("id",)),
             ("Known Networks", ("network", "list")),
@@ -356,8 +357,10 @@ def parser():
     board_args(c)
     c.add_argument("--no-monitor", action="store_true", help="don't open the monitor after")
     cmd(sub, "monitor", do_monitor, "Open the Node's serial shell (quit with Ctrl-])")
-    cmd(sub, "show", do_show, "Show firmware version, Node ID, Known Networks, Broker and images")
+    cmd(sub, "show", do_show, "Show the status, firmware version, Node ID, Known Networks, Broker and images")
 
+    cmd(sub, "status", lambda a: run_and_print(a, "status"),
+        "Show everything about the Node's state at a glance")
     cmd(sub, "version", lambda a: run_and_print(a, "version"), "Print the firmware version")
     cmd(sub, "id", lambda a: run_and_print(a, "id"), "Print the Node ID, friendly name and mDNS name")
 

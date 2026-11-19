@@ -40,6 +40,8 @@ int mqtt_adapter_subscribe_commands(void *ctx, const char *topic);
 
 void system_adapter_reboot(void *ctx);
 void system_adapter_log_warning(void *ctx, const char *message);
+/* Why the Node last reset ("watchdog", "power-on", …), for diagnostics. */
+const char *system_adapter_reset_cause(void);
 
 /* Free bytes across all heaps. */
 size_t memory_adapter_free(void *ctx);

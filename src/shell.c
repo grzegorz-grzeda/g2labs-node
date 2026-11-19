@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <zephyr/kernel.h>
 #include <zephyr/net/net_ip.h>
 
 #include <zephyr/shell/shell.h>
@@ -332,6 +333,158 @@ static int cmd_broker_show(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+/* A duration as "3d 2h 13m 05s", leaving out leading zero units. */
+static void format_duration(char *buf, size_t len, int64_t ms)
+{
+	int64_t s = ms / 1000;
+	int days = (int)(s / 86400);
+	int hours = (int)(s / 3600 % 24);
+	int minutes = (int)(s / 60 % 60);
+	int seconds = (int)(s % 60);
+
+	if (days > 0) {
+		snprintf(buf, len, "%dd %dh %02dm %02ds", days, hours, minutes, seconds);
+	} else if (hours > 0) {
+		snprintf(buf, len, "%dh %02dm %02ds", hours, minutes, seconds);
+	} else if (minutes > 0) {
+		snprintf(buf, len, "%dm %02ds", minutes, seconds);
+	} else {
+		snprintf(buf, len, "%ds", seconds);
+	}
+}
+
+static void print_wifi(const struct shell *sh, enum node_wifi_state wifi, const char *ssid)
+{
+	uint8_t mac[NODE_MAC_LEN];
+	char mac_str[3 * NODE_MAC_LEN] = "unknown";
+
+	if (wifi_adapter_mac(mac) == 0) {
+		snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x", mac[0],
+			 mac[1], mac[2], mac[3], mac[4], mac[5]);
+	}
+
+	switch (wifi) {
+	case NODE_WIFI_IDLE:
+		shell_print(sh, "Wi-Fi: offline  MAC %s", mac_str);
+		return;
+	case NODE_WIFI_SCANNING:
+		shell_print(sh, "Wi-Fi: scanning  MAC %s", mac_str);
+		return;
+	case NODE_WIFI_JOINING:
+		shell_print(sh, "Wi-Fi: joining %s  MAC %s", ssid, mac_str);
+		return;
+	case NODE_WIFI_AWAITING_IP:
+		shell_print(sh, "Wi-Fi: on %s, waiting for an IP address  MAC %s", ssid, mac_str);
+		return;
+	case NODE_WIFI_JOIN_RETRY_WAIT:
+		shell_print(sh, "Wi-Fi: join of %s failed, retrying  MAC %s", ssid, mac_str);
+		return;
+	case NODE_WIFI_CONNECTED:
+		break;
+	}
+
+	int rssi;
+	char ip[NET_IPV4_ADDR_LEN];
+
+	if (wifi_adapter_link_info(&rssi, ip, sizeof(ip)) == 0) {
+		shell_print(sh, "Wi-Fi: on %s  RSSI %d dBm  IP %s  MAC %s", ssid, rssi, ip,
+			    mac_str);
+	} else {
+		shell_print(sh, "Wi-Fi: on %s  RSSI and IP unavailable  MAC %s", ssid, mac_str);
+	}
+}
+
+static void print_broker(const struct shell *sh, const struct node_broker *b,
+			 const struct node_state *st)
+{
+	char took[32];
+	char left[32];
+
+	if (b->host[0] == '\0') {
+		shell_print(sh, "Broker: none set");
+		return;
+	}
+	switch (st->broker) {
+	case NODE_BROKER_IDLE:
+		shell_print(sh, "Broker: %s:%u, not connecting", b->host, b->port);
+		break;
+	case NODE_BROKER_CONNECTED:
+		format_duration(took, sizeof(took), st->broker_connected_ms);
+		shell_print(sh, "Broker: %s:%u connected %s", b->host, b->port, took);
+		break;
+	case NODE_BROKER_CONNECTING:
+	case NODE_BROKER_RETRY_WAIT:
+		if (st->broker == NODE_BROKER_CONNECTING && st->broker_unreachable_ms < 1000) {
+			shell_print(sh, "Broker: %s:%u connecting", b->host, b->port);
+			break;
+		}
+		format_duration(took, sizeof(took), st->broker_unreachable_ms);
+		if (st->failover_in_ms >= 0) {
+			format_duration(left, sizeof(left), st->failover_in_ms);
+			shell_print(sh, "Broker: %s:%u unreachable %s, next Known Network in %s",
+				    b->host, b->port, took, left);
+		} else {
+			shell_print(sh, "Broker: %s:%u unreachable %s", b->host, b->port, took);
+		}
+		break;
+	}
+}
+
+static int cmd_node_status(const struct shell *sh, size_t argc, char **argv)
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	char id[NODE_ID_LEN + 1];
+	char name[NODE_FRIENDLY_NAME_MAX_LEN + 1];
+	char ssid[NODE_SSID_MAX_LEN + 1];
+	char version[32];
+	struct node_broker broker;
+	struct node_state st;
+	struct node_core *core = app_core_lock();
+
+	node_core_state(core, &st);
+	snprintf(id, sizeof(id), "%s", node_core_id(core));
+	snprintf(name, sizeof(name), "%s", node_core_friendly_name(core));
+	snprintf(ssid, sizeof(ssid), "%s", st.ssid);
+	snprintf(version, sizeof(version), "%s", node_core_fw_version(core));
+	broker = *node_core_broker(core);
+	app_core_unlock();
+	memset(broker.password, 0, sizeof(broker.password));
+
+	char mdns_name[WIFI_ADAPTER_MDNS_NAME_SIZE] = "unknown";
+	char uptime[32];
+	struct image_adapter_slot slots[IMAGE_ADAPTER_SLOTS];
+	size_t count = image_adapter_list(slots);
+	const struct image_adapter_slot *running = NULL;
+
+	(void)wifi_adapter_mdns_name(mdns_name, sizeof(mdns_name));
+	format_duration(uptime, sizeof(uptime), k_uptime_get());
+	for (size_t i = 0; i < count; i++) {
+		if (slots[i].active) {
+			running = &slots[i];
+		}
+	}
+
+	shell_print(sh, "Version: %s (%s)", version, CONFIG_BOARD_TARGET);
+	shell_print(sh, "Node ID: %s  name: %s  mDNS: %s", id, name[0] != '\0' ? name : "(none)",
+		    mdns_name);
+	shell_print(sh, "Uptime: %s  last reset: %s", uptime, system_adapter_reset_cause());
+	shell_print(sh, "Free heap: %zu B", memory_adapter_free(NULL));
+	print_wifi(sh, st.wifi, ssid);
+	print_broker(sh, &broker, &st);
+	if (running != NULL) {
+		shell_print(sh, "Image: slot %d %s %s", running->slot, running->version,
+			    running->confirmed ? "confirmed" : "not confirmed yet");
+	} else {
+		shell_print(sh, "Image: unknown");
+	}
+	if (st.reboot_pending) {
+		shell_print(sh, "Reboot pending");
+	}
+	return 0;
+}
+
 static int cmd_image_list(const struct shell *sh, size_t argc, char **argv)
 {
 	ARG_UNUSED(argc);
@@ -392,6 +545,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(network_cmds,
 	SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(node_cmds,
+	SHELL_CMD_ARG(status, NULL, "Show everything about the Node's state at a glance",
+		      cmd_node_status, 1, 0),
 	SHELL_CMD_ARG(version, NULL, "Print the firmware version", cmd_node_version, 1, 0),
 	SHELL_CMD_ARG(id, NULL, "Print the Node ID, friendly name and mDNS name", cmd_node_id, 1, 0),
 	SHELL_CMD(name, &name_cmds, "Friendly name", NULL),

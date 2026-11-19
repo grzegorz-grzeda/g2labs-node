@@ -297,6 +297,10 @@ struct node_core {
 	 */
 	bool broker_outage;
 	int64_t broker_failover_deadline_ms;
+	/* When the outage began (a single-network restart of the period keeps it). */
+	int64_t broker_outage_since_ms;
+	/* While connected to the Broker: when the connection was made. */
+	int64_t broker_connected_at_ms;
 
 	/*
 	 * The running image has been confirmed this boot. It is confirmed on the
@@ -380,6 +384,36 @@ const char *node_core_id(const struct node_core *core);
 
 /* The firmware version this Node is running. */
 const char *node_core_fw_version(const struct node_core *core);
+
+/* A snapshot of what the Node is doing, for diagnostics on the shell. */
+struct node_state {
+	enum node_wifi_state wifi;
+	/*
+	 * The Known Network being joined, retried or joined; "" while idle or
+	 * scanning.
+	 */
+	const char *ssid;
+	enum node_broker_state broker;
+	/* While connected to the Broker: for how long; 0 otherwise. */
+	int64_t broker_connected_ms;
+	/*
+	 * While the Broker is unreachable on this Known Network: for how long;
+	 * 0 otherwise.
+	 */
+	int64_t broker_unreachable_ms;
+	/*
+	 * While it is unreachable and there is another Known Network to move
+	 * to: how long until the Node moves; -1 otherwise.
+	 */
+	int64_t failover_in_ms;
+	/* The running image has been confirmed this boot. */
+	bool image_confirmed;
+	/* A Reboot command is waiting to take effect. */
+	bool reboot_pending;
+};
+
+/* Fill `state` with what the Node is doing as of the latest tick. */
+void node_core_state(const struct node_core *core, struct node_state *state);
 
 #ifdef __cplusplus
 }
